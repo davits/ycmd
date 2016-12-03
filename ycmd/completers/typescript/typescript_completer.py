@@ -48,6 +48,8 @@ RESPONSE_TIMEOUT_SECONDS = 10
 
 PATH_TO_TSSERVER = utils.FindExecutable( 'tsserver' )
 
+LOGFILE_FORMAT = 'tsserver_'
+
 _logger = logging.getLogger( __name__ )
 
 
@@ -145,7 +147,7 @@ class TypeScriptCompleter( Completer ):
       if self._ServerIsRunning():
         return
 
-      self._logfile = _LogFileName()
+      self._logfile = utils.CreateLogfile( LOGFILE_FORMAT )
       tsserver_log = '-file {path} -level {level}'.format( path = self._logfile,
                                                            level = _LogLevel() )
       # TSServer gets the configuration for the log file through the
@@ -551,6 +553,7 @@ class TypeScriptCompleter( Completer ):
 
 
   def _CleanUp( self ):
+    utils.CloseStandardStreams( self._tsserver_handle )
     self._tsserver_handle = None
     if not self.user_options[ 'server_keep_logfiles' ]:
       utils.RemoveIfExists( self._logfile )
@@ -581,14 +584,6 @@ class TypeScriptCompleter( Completer ):
       return ( 'TypeScript completer debug information:\n'
                '  TSServer is not running\n'
                '  TSServer executable: {0}'.format( PATH_TO_TSSERVER ) )
-
-
-def _LogFileName():
-  with NamedTemporaryFile( dir = utils.PathToCreatedTempDir(),
-                           prefix = 'tsserver_',
-                           suffix = '.log',
-                           delete = False ) as logfile:
-    return logfile.name
 
 
 def _LogLevel():

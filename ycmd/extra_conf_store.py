@@ -1,4 +1,5 @@
-# Copyright (C) 2011, 2012 Google Inc.
+# Copyright (C) 2011-2012 Google Inc.
+#               2016      ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -36,6 +37,8 @@ from ycmd.responses import UnknownExtraConf, YCM_EXTRA_CONF_FILENAME
 from ycmd.utils import LoadPythonSource, PathsToAllParentFolders
 from fnmatch import fnmatch
 
+
+_logger = logging.getLogger( __name__ )
 
 # Singleton variables
 _module_for_module_file = {}
@@ -81,22 +84,34 @@ def Shutdown():
 
 
 def _CallGlobalExtraConfMethod( function_name ):
-  logger = _Logger()
   global_ycm_extra_conf = _GlobalYcmExtraConfFileLocation()
   if not ( global_ycm_extra_conf and
            os.path.exists( global_ycm_extra_conf ) ):
-    logger.debug( 'No global extra conf, not calling method ' + function_name )
+    _logger.debug( 'No global extra conf, '
+                   'not calling method {0}'.format( function_name ) )
     return
 
-  module = Load( global_ycm_extra_conf, force = True )
+  try:
+    module = Load( global_ycm_extra_conf, force = True )
+  except Exception:
+    _logger.exception( 'Error occurred while loading '
+                       'global extra conf {0}'.format( global_ycm_extra_conf ) )
+    return
+
   if not module or not hasattr( module, function_name ):
-    logger.debug( 'Global extra conf not loaded or no function ' +
-                  function_name )
+    _logger.debug( 'Global extra conf not loaded or no function ' +
+                   function_name )
     return
 
-  logger.info( 'Calling global extra conf method {0} on conf file {1}'.format(
-      function_name, global_ycm_extra_conf ) )
-  getattr( module, function_name )()
+  try:
+    _logger.info(
+      'Calling global extra conf method {0} '
+      'on conf file {1}'.format( function_name, global_ycm_extra_conf ) )
+    getattr( module, function_name )()
+  except Exception:
+    _logger.exception(
+      'Error occurred while calling global extra conf method {0} '
+      'on conf file {1}'.format( function_name, global_ycm_extra_conf ) )
 
 
 def Disable( module_file ):
@@ -132,21 +147,34 @@ def Load( module_file, force = False ):
   if not module_file:
     return None
 
-  if not force:
-    with _module_for_module_file_lock:
-      if module_file in _module_for_module_file:
-        return _module_for_module_file[ module_file ]
+  with _module_for_module_file_lock:
+    if module_file in _module_for_module_file:
+      return _module_for_module_file[ module_file ]
 
-    if not _ShouldLoad( module_file ):
-      Disable( module_file )
-      return None
+  if not force and not _ShouldLoad( module_file ):
+    Disable( module_file )
+    return None
 
   # This has to be here because a long time ago, the ycm_extra_conf.py files
   # used to import clang_helpers.py from the cpp folder. This is not needed
   # anymore, but there are a lot of old ycm_extra_conf.py files that we don't
   # want to break.
   sys.path.insert( 0, _PathToCppCompleterFolder() )
-  module = LoadPythonSource( _RandomName(), module_file )
+
+  # By default, the Python interpreter compiles source files into bytecode to
+  # load them faster next time they are run. These *.pyc files are generated
+  # along the source files prior to Python 3.2 or in a __pycache__ folder for
+  # newer versions. We disable the generation of these files when loading
+  # ycm_extra_conf.py files as users do not want them inside their projects.
+  # The drawback is negligible since ycm_extra_conf.py files are generally small
+  # files thus really fast to compile and only loaded once by editing session.
+  old_dont_write_bytecode = sys.dont_write_bytecode
+  sys.dont_write_bytecode = True
+  try:
+    module = LoadPythonSource( _RandomName(), module_file )
+  finally:
+    sys.dont_write_bytecode = old_dont_write_bytecode
+
   del sys.path[ 0 ]
 
   with _module_for_module_file_lock:
@@ -196,7 +224,3 @@ def _RandomName():
 def _GlobalYcmExtraConfFileLocation():
   return os.path.expanduser(
     user_options_store.Value( 'global_ycm_extra_conf' ) )
-
-
-def _Logger():
-  return logging.getLogger( __name__ )
