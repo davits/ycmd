@@ -35,6 +35,7 @@ enum CompletionKind {
   MACRO,
   PARAMETER,
   NAMESPACE,
+  OVERLOAD,
   UNKNOWN
 };
 

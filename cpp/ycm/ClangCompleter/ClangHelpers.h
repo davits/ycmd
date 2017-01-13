@@ -33,7 +33,8 @@ typedef boost::shared_ptr <
 boost::remove_pointer< CXDiagnostic >::type > DiagnosticWrap;
 
 std::vector< CompletionData > ToCompletionDataVector(
-  CXCodeCompleteResults *results );
+  CXCodeCompleteResults *results,
+  bool overloads = false );
 
 // NOTE: CXUnsavedFiles store pointers to data in UnsavedFiles, so UnsavedFiles
 // need to outlive CXUnsavedFiles!
