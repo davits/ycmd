@@ -494,7 +494,7 @@ std::vector< Token > TranslationUnit::GetSemanticTokens(
   }
 
   CXToken *tokens = NULL;
-  uint num_tokens = 0;
+  unsigned num_tokens = 0;
   clang_tokenize( clang_translation_unit_, range, &tokens, &num_tokens );
 
   std::unique_ptr< CXCursor[] > cursors( new CXCursor[ num_tokens ] );
@@ -504,7 +504,7 @@ std::vector< Token > TranslationUnit::GetSemanticTokens(
   std::vector< Token > semantic_tokens;
   semantic_tokens.reserve( num_tokens );
 
-  for ( uint i = 0; i < num_tokens; ++i ) {
+  for ( unsigned i = 0; i < num_tokens; ++i ) {
     CXTokenKind tokenKind = clang_getTokenKind( tokens[ i ] );
     CXSourceRange tokenRange = clang_getTokenExtent( clang_translation_unit_,
                                                      tokens[ i ] );
@@ -528,7 +528,7 @@ std::vector< Range > TranslationUnit::GetSkippedRanges() {
   std::vector< Range > skipped_ranges;
   skipped_ranges.reserve( source_ranges->count );
 
-  for ( uint i = 0; i < source_ranges->count; ++i ) {
+  for ( unsigned i = 0; i < source_ranges->count; ++i ) {
     const CXSourceRange &range = source_ranges->ranges[ i ];
     skipped_ranges.push_back( Range( range ) );
   }
