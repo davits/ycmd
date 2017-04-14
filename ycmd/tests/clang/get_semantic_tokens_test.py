@@ -182,7 +182,7 @@ def LiteralTokens_test( app ):
 
 @SharedYcmd
 def DetailedUsageTokens_test( app ):
-  _RunTest( app, 53, 1, 54, 28,
+  _RunTest( app, 53, 1, 54, 29,
             contains(
               _BuildTokenData( 'Identifier', 'Namespace', 53, 3, 53, 5 ),
               _BuildTokenData( 'Punctuation', 'Punctuation', 53, 5, 53, 7 ),
