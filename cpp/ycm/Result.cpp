@@ -16,14 +16,10 @@
 // along with ycmd.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "Result.h"
-#include "standard.h"
 #include "Utils.h"
-#include <boost/algorithm/string.hpp>
-#include <boost/function.hpp>
+#include <functional>
 #include <algorithm>
 #include <locale>
-
-using boost::algorithm::istarts_with;
 
 namespace YouCompleteMe {
 
@@ -50,7 +46,7 @@ bool StringLessThanWithLowercasePriority( const std::string &first,
   return std::lexicographical_compare(
            first.begin(), first.end(),
            second.begin(), second.end(),
-           boost::function< bool( const char &, const char & ) >(
+           std::function< bool( const char &, const char & ) >(
              &CharLessThanWithLowercasePriority ) );
 }
 
@@ -218,8 +214,18 @@ void Result::SetResultFeaturesFromQuery(
     num_wb_matches / static_cast< double >( query.length() );
   word_boundary_char_utilization_ =
     num_wb_matches / static_cast< double >( word_boundary_chars.length() );
-  query_is_candidate_prefix_ = istarts_with( *text_, query );
+  query_is_candidate_prefix_ = QueryIsPrefix( *text_, query );
 
+}
+
+
+bool Result::QueryIsPrefix( const std::string &text,
+                            const std::string &query ) {
+  for ( size_t i = 0; i < query.length(); ++i )
+    if ( toupper( query[ i ] ) != toupper( text[ i ] ) )
+      return false;
+
+  return true;
 }
 
 } // namespace YouCompleteMe

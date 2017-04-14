@@ -16,7 +16,6 @@
 // along with ycmd.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "ClangUtils.h"
-#include "standard.h"
 
 namespace YouCompleteMe {
 
@@ -34,14 +33,6 @@ std::string CXStringToString( CXString text ) {
 bool CursorIsValid( CXCursor cursor ) {
   return !clang_Cursor_isNull( cursor ) &&
          !clang_isInvalid( clang_getCursorKind( cursor ) );
-}
-
-bool CursorIsReference( CXCursor cursor ) {
-  return clang_isReference( clang_getCursorKind( cursor ) );
-}
-
-bool CursorIsDeclaration( CXCursor cursor ) {
-  return clang_isDeclaration( clang_getCursorKind( cursor ) );
 }
 
 std::string CXFileToFilepath( CXFile file ) {

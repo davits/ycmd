@@ -1,4 +1,5 @@
-# Copyright (C) 2011, 2012 Google Inc.
+# Copyright (C) 2011-2012 Google Inc.
+#               2017      ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -19,26 +20,25 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
-from future import standard_library
-standard_library.install_aliases()
+# Not installing aliases from python-future; it's unreliable and slow.
 from builtins import *  # noqa
-from future.utils import iteritems
 
 from collections import defaultdict
-import ycm_core
-import re
+from future.utils import iteritems
 import os.path
+import re
 import textwrap
+import xml.etree.ElementTree
+
+import ycm_core
 from ycmd import responses
-from ycmd import extra_conf_store
 from ycmd.utils import ToCppStringCompatible, ToUnicode
 from ycmd.completers.completer import Completer
 from ycmd.completers.completer_utils import GetIncludeStatementValue
-from ycmd.completers.cpp.flags import Flags, PrepareFlagsForClang
+from ycmd.completers.cpp.flags import ( Flags, PrepareFlagsForClang,
+                                        NoCompilationDatabase )
 from ycmd.completers.cpp.ephemeral_values_set import EphemeralValuesSet
 from ycmd.responses import NoExtraConfDetected, UnknownExtraConf
-
-import xml.etree.ElementTree
 
 CLANG_FILETYPES = set( [ 'c', 'cpp', 'objc', 'objcpp' ] )
 PARSING_FILE_MESSAGE = 'Still parsing file, no completions yet.'
@@ -407,25 +407,31 @@ class ClangCompleter( Completer ):
 
 
   def DebugInfo( self, request_data ):
-    filename = request_data[ 'filepath' ]
     try:
-      extra_conf = extra_conf_store.ModuleFileForSourceFile( filename )
+      # Note that it only raises NoExtraConfDetected:
+      #  - when extra_conf is None and,
+      #  - there is no compilation database
       flags = self._FlagsForRequest( request_data ) or []
-    except NoExtraConfDetected:
-      return ( 'C-family completer debug information:\n'
-               '  No configuration file found' )
-    except UnknownExtraConf as error:
-      return ( 'C-family completer debug information:\n'
-               '  Configuration file found but not loaded\n'
-               '  Configuration path: {0}'.format(
-                 error.extra_conf_file ) )
-    if not extra_conf:
-      return ( 'C-family completer debug information:\n'
-               '  No configuration file found' )
-    return ( 'C-family completer debug information:\n'
-             '  Configuration file found and loaded\n'
-             '  Configuration path: {0}\n'
-             '  Flags: {1}'.format( extra_conf, list( flags ) ) )
+    except ( NoExtraConfDetected, UnknownExtraConf ):
+      # If _FlagsForRequest returns None or raises, we use an empty list in
+      # practice.
+      flags = []
+
+    try:
+      database_directory = self._flags.FindCompilationDatabase(
+          os.path.dirname( request_data[ 'filepath' ] ) ).database_directory
+    except NoCompilationDatabase:
+      database_directory = None
+
+    database_item = responses.DebugInfoItem(
+      key = 'compilation database path',
+      value = '{0}'.format( database_directory ) )
+    flags_item = responses.DebugInfoItem(
+      key = 'flags', value = '{0}'.format( list( flags ) ) )
+
+    return responses.BuildDebugInfoResponse( name = 'C-family',
+                                             items = [ database_item,
+                                                       flags_item ] )
 
 
   def _FlagsForRequest( self, request_data ):

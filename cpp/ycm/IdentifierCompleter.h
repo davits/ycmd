@@ -21,11 +21,6 @@
 #include "DLLDefines.h"
 #include "IdentifierDatabase.h"
 
-#include <boost/utility.hpp>
-#include <boost/unordered_map.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
-
 #include <vector>
 #include <string>
 
@@ -35,12 +30,17 @@ namespace YouCompleteMe {
 class Candidate;
 
 
-class IdentifierCompleter : boost::noncopyable {
+class IdentifierCompleter {
 public:
+
+  IdentifierCompleter( const IdentifierCompleter& ) = delete;
+  IdentifierCompleter& operator=( const IdentifierCompleter ) = delete;
+
   YCM_DLL_EXPORT IdentifierCompleter();
   YCM_DLL_EXPORT IdentifierCompleter(
     const std::vector< std::string > &candidates );
-  IdentifierCompleter( const std::vector< std::string > &candidates,
+  YCM_DLL_EXPORT IdentifierCompleter(
+                       const std::vector< std::string > &candidates,
                        const std::string &filetype,
                        const std::string &filepath );
 

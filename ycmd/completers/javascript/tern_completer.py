@@ -1,4 +1,4 @@
-# Copyright (C) 2015 ycmd contributors
+# Copyright (C) 2015-2017 ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -19,11 +19,10 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
+# Not installing aliases from python-future; it's unreliable and slow.
 from builtins import *  # noqa
-from future.utils import iterkeys
-from future import standard_library
-standard_library.install_aliases()
 
+from future.utils import iterkeys
 import logging
 import os
 import requests
@@ -49,7 +48,8 @@ PATH_TO_TERN_BINARY = os.path.abspath(
     'bin',
     'tern' ) )
 
-PATH_TO_NODE = utils.PathToFirstExistingExecutable( [ 'node' ] )
+# On Debian-based distributions, node is by default installed as nodejs.
+PATH_TO_NODE = utils.PathToFirstExistingExecutable( [ 'nodejs', 'node' ] )
 
 # host name/address on which the tern server should listen
 # note: we use 127.0.0.1 rather than localhost because on some platforms
@@ -256,32 +256,16 @@ class TernCompleter( Completer ):
 
   def DebugInfo( self, request_data ):
     with self._server_state_mutex:
-      if self._ServerIsRunning():
-        return ( 'JavaScript completer debug information:\n'
-                 '  Tern running at: {0}\n'
-                 '  Tern process ID: {1}\n'
-                 '  Tern executable: {2}\n'
-                 '  Tern logfiles:\n'
-                 '    {3}\n'
-                 '    {4}'.format( self._GetServerAddress(),
-                                   self._server_handle.pid,
-                                   PATH_TO_TERN_BINARY,
-                                   self._server_stdout,
-                                   self._server_stderr ) )
+      tern_server = responses.DebugInfoServer(
+        name = 'Tern',
+        handle = self._server_handle,
+        executable = PATH_TO_TERN_BINARY,
+        address = SERVER_HOST,
+        port = self._server_port,
+        logfiles = [ self._server_stdout, self._server_stderr ] )
 
-      if self._server_stdout and self._server_stderr:
-        return ( 'JavaScript completer debug information:\n'
-                 '  Tern no longer running\n'
-                 '  Tern executable: {0}\n'
-                 '  Tern logfiles:\n'
-                 '    {1}\n'
-                 '    {2}\n'.format( PATH_TO_TERN_BINARY,
-                                     self._server_stdout,
-                                     self._server_stderr ) )
-
-      return ( 'JavaScript completer debug information:\n'
-               '  Tern is not running\n'
-               '  Tern executable: {0}'.format( PATH_TO_TERN_BINARY ) )
+      return responses.BuildDebugInfoResponse( name = 'JavaScript',
+                                               servers = [ tern_server ] )
 
 
   def Shutdown( self ):

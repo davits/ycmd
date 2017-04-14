@@ -17,21 +17,17 @@
 
 #include "CompilationDatabase.h"
 #include "ClangUtils.h"
-#include "standard.h"
 #include "ReleaseGil.h"
 #include "PythonSupport.h"
 
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/type_traits/remove_pointer.hpp>
-#include <boost/thread/locks.hpp>
+#include <memory>
 
-using boost::lock_guard;
-using boost::unique_lock;
-using boost::try_to_lock_t;
-using boost::remove_pointer;
-using boost::shared_ptr;
-using boost::mutex;
+using std::lock_guard;
+using std::unique_lock;
+using std::try_to_lock_t;
+using std::remove_pointer;
+using std::shared_ptr;
+using std::mutex;
 
 namespace YouCompleteMe {
 
@@ -41,11 +37,11 @@ remove_pointer< CXCompileCommands >::type > CompileCommandsWrap;
 
 CompilationDatabase::CompilationDatabase(
   const boost::python::object &path_to_directory )
-  : is_loaded_( false ) {
+  : is_loaded_( false )
+  , path_to_directory_( GetUtf8String( path_to_directory ) ) {
   CXCompilationDatabase_Error status;
-  std::string path_to_directory_string = GetUtf8String( path_to_directory );
   compilation_database_ = clang_CompilationDatabase_fromDirectory(
-                            path_to_directory_string.c_str(),
+                            path_to_directory_.c_str(),
                             &status );
   is_loaded_ = status == CXCompilationDatabase_NoError;
 }
@@ -84,7 +80,7 @@ CompilationInfoForFile CompilationDatabase::GetCompilationInfoForFile(
       compilation_database_,
       path_to_file_string.c_str() ), clang_CompileCommands_dispose );
 
-  uint num_commands = clang_CompileCommands_getSize( commands.get() );
+  size_t num_commands = clang_CompileCommands_getSize( commands.get() );
 
   if ( num_commands < 1 ) {
     return info;
@@ -98,10 +94,10 @@ CompilationInfoForFile CompilationDatabase::GetCompilationInfoForFile(
   info.compiler_working_dir_ = CXStringToString(
                                  clang_CompileCommand_getDirectory( command ) );
 
-  uint num_flags = clang_CompileCommand_getNumArgs( command );
+  size_t num_flags = clang_CompileCommand_getNumArgs( command );
   info.compiler_flags_.reserve( num_flags );
 
-  for ( uint i = 0; i < num_flags; ++i ) {
+  for ( size_t i = 0; i < num_flags; ++i ) {
     info.compiler_flags_.push_back(
       CXStringToString( clang_CompileCommand_getArg( command, i ) ) );
   }

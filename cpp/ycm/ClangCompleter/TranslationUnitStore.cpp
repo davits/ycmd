@@ -20,21 +20,34 @@
 #include "Utils.h"
 #include "exceptions.h"
 
-#include <boost/thread/locks.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/functional/hash.hpp>
+#include <functional>
 
-using boost::lock_guard;
-using boost::shared_ptr;
-using boost::make_shared;
-using boost::mutex;
+using std::lock_guard;
+using std::shared_ptr;
+using std::make_shared;
+using std::mutex;
 
 namespace YouCompleteMe {
 
 namespace {
 
 std::size_t HashForFlags( const std::vector< std::string > &flags ) {
-  return boost::hash< std::vector< std::string > >()( flags );
+  /*
+   * The way boost::hash implements hash< std::vector<T> > goes after the
+   * described way in "Library Extension Technical Report - Issue List"
+   * section 6.18. This function's body is taken straight (copy-pasted)
+   * from the TR to replicate boost's behaviour.
+   *
+   * When (if) it ends up in the STL this whole function could be
+   * replaced with:
+   *
+   * return std::hash< std::vector< std::string > >()( flags );
+   */
+  size_t seed = 0;
+  for ( auto flag : flags ) {
+    seed ^= std::hash< std::string >()( flag ) + ( seed<<6 ) + ( seed>>2 );
+  }
+  return seed;
 }
 
 }  // unnamed namespace
@@ -86,13 +99,13 @@ shared_ptr< TranslationUnit > TranslationUnitStore::GetOrCreate(
     filename_to_flags_hash_[ filename ] = HashForFlags( flags );
   }
 
-  boost::shared_ptr< TranslationUnit > unit;
+  shared_ptr< TranslationUnit > unit;
 
   try {
-    unit = boost::make_shared< TranslationUnit >( filename,
-                                                  unsaved_files,
-                                                  flags,
-                                                  clang_index_ );
+    unit = make_shared< TranslationUnit >( filename,
+                                           unsaved_files,
+                                           flags,
+                                           clang_index_ );
   } catch ( ClangParseError & ) {
     Remove( filename );
     return unit;

@@ -16,14 +16,15 @@ source ci/travis/travis_install.${TRAVIS_OS_NAME}.sh
 # pyenv setup
 #############
 
-export PYENV_ROOT="${HOME}/.pyenv"
+PYENV_ROOT="${HOME}/.pyenv"
 
 if [ ! -d "${PYENV_ROOT}/.git" ]; then
+  rm -rf ${PYENV_ROOT}
   git clone https://github.com/yyuu/pyenv.git ${PYENV_ROOT}
 fi
 pushd ${PYENV_ROOT}
 git fetch --tags
-git checkout v20160202
+git checkout v1.0.8
 popd
 
 export PATH="${PYENV_ROOT}/bin:${PATH}"
@@ -68,17 +69,12 @@ echo -e "import coverage\ncoverage.process_startup()" > \
 # rust setup
 ############
 
-# Need rust available, but travis doesn't give it to you without language: rust
-pushd ${HOME}
-git clone --recursive https://github.com/brson/multirust
-cd multirust
-git reset --hard f3974f2b966476ad656afba311b50a9c23fe6d2e
-./build.sh
-./install.sh --prefix=${HOME}
-popd
+curl https://sh.rustup.rs -sSf | sh -s -- -y
 
-multirust update stable
-multirust default stable
+export PATH="${HOME}/.cargo/bin:${PATH}"
+rustup update
+rustc -Vv
+cargo -V
 
 ###############
 # Node.js setup

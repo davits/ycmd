@@ -1,4 +1,4 @@
-# Copyright (C) 2016 ycmd contributors
+# Copyright (C) 2016-2017 ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -19,52 +19,33 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
-from future import standard_library
-standard_library.install_aliases()
+# Not installing aliases from python-future; it's unreliable and slow.
 from builtins import *  # noqa
 
-from hamcrest import assert_that, matches_regexp
+from hamcrest import ( assert_that, contains, empty, has_entries, has_entry,
+                       instance_of )
 
-from ycmd.tests.javascript import IsolatedYcmd, SharedYcmd
-from ycmd.tests.test_utils import BuildRequest, StopCompleterServer, UserOption
+from ycmd.tests.javascript import SharedYcmd
+from ycmd.tests.test_utils import BuildRequest
 
 
 @SharedYcmd
-def DebugInfo_ServerIsRunning_test( app ):
+def DebugInfo_test( app ):
   request_data = BuildRequest( filetype = 'javascript' )
   assert_that(
     app.post_json( '/debug_info', request_data ).json,
-    matches_regexp( 'JavaScript completer debug information:\n'
-                    '  Tern running at: http://127.0.0.1:\d+\n'
-                    '  Tern process ID: \d+\n'
-                    '  Tern executable: .+\n'
-                    '  Tern logfiles:\n'
-                    '    .+\n'
-                    '    .+' ) )
-
-
-@IsolatedYcmd
-def DebugInfo_ServerIsNotRunning_LogfilesExist_test( app ):
-  with UserOption( 'server_keep_logfiles', True ):
-    StopCompleterServer( app, 'javascript' )
-    request_data = BuildRequest( filetype = 'javascript' )
-    assert_that(
-      app.post_json( '/debug_info', request_data ).json,
-      matches_regexp( 'JavaScript completer debug information:\n'
-                      '  Tern no longer running\n'
-                      '  Tern executable: .+\n'
-                      '  Tern logfiles:\n'
-                      '    .+\n'
-                      '    .+' ) )
-
-
-@IsolatedYcmd
-def DebugInfo_ServerIsNotRunning_LogfilesDoNotExist_test( app ):
-  with UserOption( 'server_keep_logfiles', False ):
-    StopCompleterServer( app, 'javascript' )
-    request_data = BuildRequest( filetype = 'javascript' )
-    assert_that(
-      app.post_json( '/debug_info', request_data ).json,
-      matches_regexp( 'JavaScript completer debug information:\n'
-                      '  Tern is not running\n'
-                      '  Tern executable: .+' ) )
+    has_entry( 'completer', has_entries( {
+      'name': 'JavaScript',
+      'servers': contains( has_entries( {
+        'name': 'Tern',
+        'is_running': instance_of( bool ),
+        'executable': instance_of( str ),
+        'pid': instance_of( int ),
+        'address': instance_of( str ),
+        'port': instance_of( int ),
+        'logfiles': contains( instance_of( str ),
+                              instance_of( str ) )
+      } ) ),
+      'items': empty()
+    } ) )
+  )

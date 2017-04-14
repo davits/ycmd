@@ -1,5 +1,5 @@
-# Copyright (C) 2015 - 2016 Google Inc.
-#               2016 ycmd contributors
+# Copyright (C) 2015-2016 Google Inc.
+#               2016-2017 ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -20,8 +20,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
-from future import standard_library
-standard_library.install_aliases()
+# Not installing aliases from python-future; it's unreliable and slow.
 from builtins import *  # noqa
 
 import json
@@ -31,6 +30,7 @@ import re
 import subprocess
 import itertools
 import threading
+from functools import partial
 
 from tempfile import NamedTemporaryFile
 
@@ -39,14 +39,14 @@ from ycmd import utils
 from ycmd.completers.completer import Completer
 from ycmd.completers.completer_utils import GetFileContents
 
-BINARY_NOT_FOUND_MESSAGE = ( 'TSServer not found. '
-                             'TypeScript 1.5 or higher is required.' )
 SERVER_NOT_RUNNING_MESSAGE = 'TSServer is not running.'
+NO_DIAGNOSTIC_MESSAGE = 'No diagnostic for current line!'
 
 MAX_DETAILED_COMPLETIONS = 100
 RESPONSE_TIMEOUT_SECONDS = 10
 
-PATH_TO_TSSERVER = utils.FindExecutable( 'tsserver' )
+# On Debian-based distributions, node is by default installed as nodejs.
+PATH_TO_NODE = utils.PathToFirstExistingExecutable( [ 'nodejs', 'node' ] )
 
 LOGFILE_FORMAT = 'tsserver_'
 
@@ -80,14 +80,86 @@ class DeferredResponse( object ):
       return self._message[ 'body' ]
 
 
-def ShouldEnableTypescriptCompleter():
-  if not PATH_TO_TSSERVER:
-    _logger.error( BINARY_NOT_FOUND_MESSAGE )
-    return False
+def FindTsserverBinary():
+  tsserver = utils.FindExecutable( 'tsserver' )
+  if not tsserver:
+    return None
 
-  _logger.info( 'Using TSServer located at {0}'.format( PATH_TO_TSSERVER ) )
+  if not utils.OnWindows():
+    return tsserver
+
+  # On Windows, tsserver is a batch script that calls the tsserver binary with
+  # node.
+  return os.path.abspath( os.path.join(
+    os.path.dirname( tsserver ), 'node_modules', 'typescript', 'bin',
+    'tsserver' ) )
+
+
+def ShouldEnableTypeScriptCompleter():
+  if not PATH_TO_NODE:
+    _logger.warning( 'Not using TypeScript completer: unable to find node' )
+    return False
+  _logger.info( 'Using node binary from {0}'.format( PATH_TO_NODE ) )
+
+  tsserver_binary_path = FindTsserverBinary()
+  if not tsserver_binary_path:
+    _logger.error( 'Not using TypeScript completer: unable to find TSServer.'
+                   'TypeScript 1.5 or higher is required.' )
+    return False
+  _logger.info( 'Using TSServer from {0}'.format( tsserver_binary_path ) )
 
   return True
+
+
+def TsDiagnosticToYcmdDiagnostic( filepath, line_value, ts_diagnostic ):
+  ts_start_location = ts_diagnostic[ 'startLocation' ]
+  ts_end_location = ts_diagnostic[ 'endLocation' ]
+
+  start_offset = utils.CodepointOffsetToByteOffset( line_value,
+                                              ts_start_location[ 'offset' ] )
+  end_offset = utils.CodepointOffsetToByteOffset( line_value,
+                                            ts_end_location[ 'offset' ] )
+
+  location = responses.Location( ts_start_location[ 'line' ],
+                                 start_offset,
+                                 filepath )
+  location_end = responses.Location( ts_end_location[ 'line' ],
+                                     end_offset,
+                                     filepath )
+
+  location_extent = responses.Range( location, location_end )
+
+  return responses.Diagnostic( [ location_extent ],
+                               location,
+                               location_extent,
+                               ts_diagnostic[ 'message' ],
+                               'ERROR' )
+
+
+def IsLineInTsDiagnosticRange( line, ts_diagnostic ):
+  ts_start_line = ts_diagnostic[ 'startLocation' ][ 'line' ]
+  ts_end_line = ts_diagnostic[ 'endLocation' ][ 'line' ]
+
+  return ts_start_line <= line and ts_end_line >= line
+
+
+def GetByteOffsetDistanceFromTsDiagnosticRange(
+      byte_offset,
+      line_value,
+      ts_diagnostic ):
+  ts_start_offset = ts_diagnostic[ 'startLocation' ][ 'offset' ]
+  ts_end_offset = ts_diagnostic[ 'endLocation' ][ 'offset' ]
+
+  codepoint_offset = utils.ByteOffsetToCodepointOffset( line_value,
+                                                        byte_offset )
+
+  start_difference = codepoint_offset - ts_start_offset
+  end_difference = codepoint_offset - ( ts_end_offset - 1 )
+
+  if start_difference >= 0 and end_difference <= 0:
+    return 0
+
+  return min( abs( start_difference ), abs( end_difference ) )
 
 
 class TypeScriptCompleter( Completer ):
@@ -105,6 +177,8 @@ class TypeScriptCompleter( Completer ):
     super( TypeScriptCompleter, self ).__init__( user_options )
 
     self._logfile = None
+
+    self._tsserver_binary_path = FindTsserverBinary()
 
     self._tsserver_handle = None
 
@@ -139,6 +213,9 @@ class TypeScriptCompleter( Completer ):
     # the pending response dictionary
     self._pending_lock = threading.Lock()
 
+    self._max_diagnostics_to_display = user_options[
+      'max_diagnostics_to_display' ]
+
     _logger.info( 'Enabling typescript completion' )
 
 
@@ -160,7 +237,8 @@ class TypeScriptCompleter( Completer ):
       _logger.info( 'TSServer log file: {0}'.format( self._logfile ) )
 
       # We need to redirect the error stream to the output one on Windows.
-      self._tsserver_handle = utils.SafePopen( PATH_TO_TSSERVER,
+      self._tsserver_handle = utils.SafePopen( [ PATH_TO_NODE,
+                                                 self._tsserver_binary_path ],
                                                stdin = subprocess.PIPE,
                                                stdout = subprocess.PIPE,
                                                stderr = subprocess.STDOUT,
@@ -381,6 +459,86 @@ class TypeScriptCompleter( Completer ):
   def OnFileReadyToParse( self, request_data ):
     self._Reload( request_data )
 
+    diagnostics = self.GetDiagnosticsForCurrentFile( request_data )
+    return [ responses.BuildDiagnosticData( x ) for x in diagnostics ]
+
+
+  def GetTsDiagnosticsForCurrentFile( self, filename, request_data ):
+    # This returns the data the TypeScript server responded with.
+    # Note that its "offset" values represent codepoint offsets,
+    # not byte offsets, which are required by the ycmd API.
+
+    ts_diagnostics = list( itertools.chain(
+      self._GetSemanticDiagnostics( filename ),
+      self._GetSyntacticDiagnostics( filename )
+    ) )
+
+    return ts_diagnostics
+
+
+  def GetDiagnosticsForCurrentFile( self, request_data ):
+    filename = request_data[ 'filepath' ]
+    line_value = request_data[ 'line_value' ]
+
+    ts_diagnostics = self.GetTsDiagnosticsForCurrentFile( filename,
+                                                          request_data )
+
+    return [ TsDiagnosticToYcmdDiagnostic( filename, line_value, x )
+             for x in ts_diagnostics[ : self._max_diagnostics_to_display ] ]
+
+
+  def GetDetailedDiagnostic( self, request_data ):
+    filename = request_data[ 'filepath' ]
+    line_value = request_data[ 'line_value' ]
+    current_line = request_data[ 'line_num' ]
+    current_byte_offset = request_data[ 'column_num' ]
+
+    ts_diagnostics = self.GetTsDiagnosticsForCurrentFile( filename,
+                                                          request_data )
+    ts_diagnostics_on_line = list( filter(
+      partial( IsLineInTsDiagnosticRange, current_line ),
+      ts_diagnostics
+    ) )
+
+    if not ts_diagnostics_on_line:
+      raise ValueError( NO_DIAGNOSTIC_MESSAGE )
+
+    closest_ts_diagnostic = None
+    distance_to_closest_ts_diagnostic = None
+
+    for ts_diagnostic in ts_diagnostics_on_line:
+      distance = GetByteOffsetDistanceFromTsDiagnosticRange(
+        current_byte_offset,
+        line_value,
+        ts_diagnostic
+      )
+      if ( not closest_ts_diagnostic
+            or distance < distance_to_closest_ts_diagnostic ):
+        distance_to_closest_ts_diagnostic = distance
+        closest_ts_diagnostic = ts_diagnostic
+
+    closest_diagnostic = TsDiagnosticToYcmdDiagnostic(
+      filename,
+      line_value,
+      closest_ts_diagnostic
+    )
+
+    return responses.BuildDisplayMessageResponse( closest_diagnostic.text_ )
+
+
+  def _GetSemanticDiagnostics( self, filename ):
+    return self._SendRequest( 'semanticDiagnosticsSync', {
+      'file': filename,
+      'includeLinePosition': True
+    } )
+
+
+  def _GetSyntacticDiagnostics( self, filename ):
+    return self._SendRequest( 'syntacticDiagnosticsSync', {
+      'file': filename,
+      'includeLinePosition': True
+    } )
+
 
   def _GoToDefinition( self, request_data ):
     self._Reload( request_data )
@@ -566,24 +724,14 @@ class TypeScriptCompleter( Completer ):
 
   def DebugInfo( self, request_data ):
     with self._server_lock:
-      if self._ServerIsRunning():
-        return ( 'TypeScript completer debug information:\n'
-                 '  TSServer running\n'
-                 '  TSServer process ID: {0}\n'
-                 '  TSServer executable: {1}\n'
-                 '  TSServer logfile: {2}'.format( self._tsserver_handle.pid,
-                                                   PATH_TO_TSSERVER,
-                                                   self._logfile ) )
-      if self._logfile:
-        return ( 'TypeScript completer debug information:\n'
-                 '  TSServer no longer running\n'
-                 '  TSServer executable: {0}\n'
-                 '  TSServer logfile: {1}'.format( PATH_TO_TSSERVER,
-                                                   self._logfile ) )
+      tsserver = responses.DebugInfoServer(
+          name = 'TSServer',
+          handle = self._tsserver_handle,
+          executable = self._tsserver_binary_path,
+          logfiles = [ self._logfile ] )
 
-      return ( 'TypeScript completer debug information:\n'
-               '  TSServer is not running\n'
-               '  TSServer executable: {0}'.format( PATH_TO_TSSERVER ) )
+      return responses.BuildDebugInfoResponse( name = 'TypeScript',
+                                               servers = [ tsserver ] )
 
 
 def _LogLevel():

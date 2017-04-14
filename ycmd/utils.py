@@ -21,17 +21,27 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
-from future import standard_library
-standard_library.install_aliases()
+# Not installing aliases from python-future; it's unreliable and slow.
 from builtins import *  # noqa
-from future.utils import PY2, native
 
+from future.utils import PY2, native
 import os
 import socket
 import subprocess
 import sys
 import tempfile
 import time
+
+
+# Idiom to import urljoin and urlparse on Python 2 and 3. By exposing these
+# functions here, we can import them directly from this module:
+#
+#   from ycmd.utils import urljoin, urlparse
+#
+if PY2:
+  from urlparse import urljoin, urlparse
+else:
+  from urllib.parse import urljoin, urlparse  # noqa
 
 
 # Creation flag to disable creating a console window on Windows. See
@@ -386,10 +396,18 @@ def GetShortPathName( path ):
 def LoadPythonSource( name, pathname ):
   if PY2:
     import imp
-    return imp.load_source( name, pathname )
-  else:
-    import importlib
-    return importlib.machinery.SourceFileLoader( name, pathname ).load_module()
+    try:
+      return imp.load_source( name, pathname )
+    except UnicodeEncodeError:
+      # imp.load_source doesn't handle non-ASCII characters in pathname. See
+      # http://bugs.python.org/issue9425
+      source = ReadFile( pathname )
+      module = imp.new_module( name )
+      module.__file__ = pathname
+      exec( source, module.__dict__ )
+      return module
+  import importlib
+  return importlib.machinery.SourceFileLoader( name, pathname ).load_module()
 
 
 def SplitLines( contents ):

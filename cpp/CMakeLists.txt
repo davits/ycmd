@@ -115,23 +115,27 @@ endif()
 # Determining the presence of C++11 support in the compiler
 set( CPP11_AVAILABLE false )
 if ( CMAKE_COMPILER_IS_GNUCXX )
-  execute_process(
-    COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
-  if ( GCC_VERSION VERSION_GREATER 4.6 OR GCC_VERSION VERSION_EQUAL 4.6 )
+  if ( NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9 )
     set( CPP11_AVAILABLE true )
   endif()
 elseif( COMPILER_IS_CLANG )
-  set( CPP11_AVAILABLE true )
-  set( CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++11" )
-  set( CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++" )
+  if ( NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.3 )
+    set( CPP11_AVAILABLE true )
+    set( CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++11" )
+    set( CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++" )
+  endif()
+elseif( MSVC )
+  if ( NOT MSVC_VERSION LESS 1800 )
+    set( CPP11_AVAILABLE true )
+  endif()
 endif()
 
 #############################################################################
 
 # For MSVC enable UNICODE and compilation on multiple processors
 if ( MSVC )
-  add_definitions( /DUNICODE /D_UNICODE /Zc:wchar_t-  )
-	set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP" )
+  add_definitions( /DUNICODE /D_UNICODE /Zc:wchar_t- )
+  set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP" )
 endif()
 
 # Solves the conflict in names of hypot in python sources and boost::python
@@ -148,46 +152,41 @@ endif()
 # TODO: remove this when it's fixed upstream (probably boost 1.53).
 add_definitions( -DBOOST_THREAD_DONT_USE_CHRONO )
 
-if( MSVC OR CYGWIN )
+if( MSVC OR CYGWIN OR MSYS)
   # BOOST_ALL_NO_LIB turns off MSVC library autolinking
   add_definitions( -DBOOST_ALL_NO_LIB )
 endif()
 
-if( WIN32 OR CYGWIN )
+if( WIN32 OR CYGWIN OR MSYS)
   # BOOST_PYTHON_SOURCE makes boost use the correct __declspec
   add_definitions( -DBOOST_PYTHON_SOURCE -DBOOST_THREAD_USE_LIB )
-  if ( 64_BIT_PLATFORM )
-    # Enables python compilation for 64-bit Windows
+  if ( NOT MSVC AND 64_BIT_PLATFORM )
+      # Enables Python compilation for 64-bit Windows. Already defined by Python
+      # headers when compiling with MSVC.
     add_definitions( -DMS_WIN64 )
   endif()
 endif()
 
 #############################################################################
 
-# When used with Clang, adding the -std=c++0x flag to CMAKE_CXX_FLAGS will cause
+# When used with Clang, adding the -std=c++11 flag to CMAKE_CXX_FLAGS will cause
 # the compiler to output a warning during linking:
-#  clang: warning: argument unused during compilation: '-std=c++0x'
+#  clang: warning: argument unused during compilation: '-std=c++11'
 # This is caused by cmake passing this flag to the linking stage which it
 # shouldn't do. It's ignored so it does no harm, but the warning is annoying.
 #
 # Putting the flag in add_definitions() works around the issue, even though it
 # shouldn't in theory go there.
 if ( CPP11_AVAILABLE )
-  message( "Your C++ compiler supports C++11, compiling in that mode." )
-
   # Cygwin needs its hand held a bit; see issue #473
   if ( CYGWIN AND CMAKE_COMPILER_IS_GNUCXX )
-    add_definitions( -std=gnu++0x )
-  else()
-    add_definitions( -std=c++0x )
+    add_definitions( -std=gnu++11 )
+  elseif( NOT MSVC )
+    add_definitions( -std=c++11 )
   endif()
 else()
-  message(
-    "Your C++ compiler does NOT support C++11, compiling in C++03 mode." )
+  message( FATAL_ERROR "Your C++ compiler does NOT fully support C++11." )
 endif()
-
-
-#############################################################################
 
 # Note: build.py always explicitly sets this option, so the default used here
 # rarely matters.

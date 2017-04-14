@@ -21,8 +21,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
-from future import standard_library
-standard_library.install_aliases()
+# Not installing aliases from python-future; it's unreliable and slow.
 from builtins import *  # noqa
 
 from nose.tools import eq_, ok_
@@ -135,6 +134,12 @@ def ExtractIdentifiersFromText_Html_test():
 def ExtractIdentifiersFromText_Html_TemplateChars_test():
   assert_that( iu.ExtractIdentifiersFromText( '<foo>{{goo}}</foo>', 'html' ),
                has_item( 'goo' ) )
+
+
+def ExtractIdentifiersFromText_JavaScript_test():
+  eq_( [ "var", "foo", "require", "bar" ],
+       iu.ExtractIdentifiersFromText( "var foo = require('bar');",
+                                      'javascript' ) )
 
 
 def IsIdentifier_Default_test():

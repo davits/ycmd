@@ -20,7 +20,6 @@
 #include "Result.h"
 #include "Candidate.h"
 #include "TranslationUnit.h"
-#include "standard.h"
 #include "CandidateRepository.h"
 #include "CompletionData.h"
 #include "Utils.h"
@@ -28,11 +27,10 @@
 #include "ReleaseGil.h"
 
 #include <clang-c/Index.h>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 
-using boost::shared_ptr;
-using boost::unordered_map;
+using std::shared_ptr;
 
 namespace YouCompleteMe {
 

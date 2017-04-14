@@ -20,19 +20,16 @@
 
 #include "DLLDefines.h"
 
-#include <boost/utility.hpp>
-#include <boost/unordered_map.hpp>
-#include <boost/thread/mutex.hpp>
-
 #include <vector>
 #include <string>
+#include <unordered_map>
+#include <mutex>
 
 namespace YouCompleteMe {
 
 class Candidate;
-struct CompletionData;
 
-typedef boost::unordered_map< std::string, const Candidate * >
+typedef std::unordered_map< std::string, const Candidate * >
 CandidateHolder;
 
 
@@ -44,19 +41,17 @@ CandidateHolder;
 // work is not repeated.
 //
 // This class is thread-safe.
-class CandidateRepository : boost::noncopyable {
+class CandidateRepository {
 public:
   YCM_DLL_EXPORT static CandidateRepository &Instance();
+  // Make class noncopyable
+  CandidateRepository( const CandidateRepository& ) = delete;
+  CandidateRepository& operator=( const CandidateRepository& ) = delete;
 
   int NumStoredCandidates();
 
   YCM_DLL_EXPORT std::vector< const Candidate * > GetCandidatesForStrings(
     const std::vector< std::string > &strings );
-
-#ifdef USE_CLANG_COMPLETER
-  std::vector< const Candidate * > GetCandidatesForStrings(
-    const std::vector< CompletionData > &datas );
-#endif // USE_CLANG_COMPLETER
 
 private:
   CandidateRepository() {};
@@ -64,9 +59,9 @@ private:
 
   const std::string &ValidatedCandidateText( const std::string &text );
 
-  boost::mutex holder_mutex_;
+  std::mutex holder_mutex_;
 
-  static boost::mutex singleton_mutex_;
+  static std::mutex singleton_mutex_;
   static CandidateRepository *instance_;
 
   const std::string empty_;
