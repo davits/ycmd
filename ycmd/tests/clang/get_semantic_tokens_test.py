@@ -240,3 +240,14 @@ def StaticMemberTokens_test( app ):
               _BuildTokenData( 'Identifier', 'StaticMemberVariable',
                                75, 10, 75, 11 ),
             ) )
+
+
+@SharedYcmd
+def RangeCorrectness_test( app ):
+  _RunTest( app, 81, 1, 81, 17,
+            contains(
+              _BuildTokenData( 'Keyword', 'Keyword', 81, 9, 81, 12 ),
+              _BuildTokenData( 'Identifier', 'Variable', 81, 13, 81, 14 ),
+              _BuildTokenData( 'Punctuation', 'Punctuation', 81, 15, 81, 16 ),
+              _BuildTokenData( 'Identifier', 'Variable', 81, 17, 81, 18 ),
+            ) )

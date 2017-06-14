@@ -73,3 +73,11 @@ struct SSS
 };
 
 int SSS::s = 0;
+
+void range_testing()
+{
+        int a = 1;
+        int b = 2;
+        int c = a
+                + b;
+}
