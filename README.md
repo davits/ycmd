@@ -1,9 +1,9 @@
-ycmd: a code-completion & comprehension server
+ycmd: a
 ==============================================
 
-[![Build Status](https://travis-ci.org/Valloric/ycmd.svg?branch=master)](https://travis-ci.org/Valloric/ycmd)
-[![Build status](https://ci.appveyor.com/api/projects/status/6fetp5xwb0kkuv2w/branch/master?svg=true)](https://ci.appveyor.com/project/Valloric/ycmd)
-[![Coverage Status](https://codecov.io/gh/Valloric/ycmd/branch/master/graph/badge.svg)](https://codecov.io/gh/Valloric/ycmd)
+[![Build Status](https://travis-ci.org/davits/ycmd.svg?branch=master)](https://travis-ci.org/davits/ycmd)
+[![Build status](https://ci.appveyor.com/api/projects/status/6fetp5xwb0kkuv2w/branch/master?svg=true)](https://ci.appveyor.com/project/davits/ycmd)
+[![Coverage Status](https://codecov.io/gh/davits/ycmd/branch/master/graph/badge.svg)](https://codecov.io/gh/davits/ycmd)
 
 ycmd is a server that provides APIs for code-completion and other
 code-comprehension use-cases like semantic GoTo commands (and others). For
@@ -311,25 +311,25 @@ This software is licensed under the [GPL v3 license][gpl].
 [semver]: http://semver.org/
 [hmac]: http://en.wikipedia.org/wiki/Hash-based_message_authentication_code
 [exploit]: https://groups.google.com/d/topic/ycm-users/NZAPrvaYgxo/discussion
-[example-client]: https://github.com/Valloric/ycmd/blob/master/examples/example_client.py
-[example-readme]: https://github.com/Valloric/ycmd/blob/master/examples/README.md
-[trigger-defaults]: https://github.com/Valloric/ycmd/blob/master/ycmd/completers/completer_utils.py#L143
+[example-client]: https://github.com/davits/ycmd/blob/master/examples/example_client.py
+[example-readme]: https://github.com/davits/ycmd/blob/master/examples/README.md
+[trigger-defaults]: https://github.com/davits/ycmd/blob/master/ycmd/completers/completer_utils.py#L143
 [subsequence]: http://en.wikipedia.org/wiki/Subsequence
-[ycm-install]: https://github.com/Valloric/YouCompleteMe/blob/master/README.md#mac-os-x
-[def-settings]: https://github.com/Valloric/ycmd/blob/master/ycmd/default_settings.json
+[ycm-install]: https://github.com/davits/YouCompleteMe/blob/master/README.md#mac-os-x
+[def-settings]: https://github.com/davits/ycmd/blob/master/ycmd/default_settings.json
 [base64]: http://en.wikipedia.org/wiki/Base64
 [mkstemp]: http://man7.org/linux/man-pages/man3/mkstemp.3.html
-[options]: https://github.com/Valloric/YouCompleteMe#options
-[extra-conf-doc]: https://github.com/Valloric/YouCompleteMe#c-family-semantic-completion
+[options]: https://github.com/davits/YouCompleteMe#options
+[extra-conf-doc]: https://github.com/davits/YouCompleteMe#c-family-semantic-completion
 [emacs-ycmd]: https://github.com/abingham/emacs-ycmd
 [gpl]: http://www.gnu.org/copyleft/gpl.html
 [gocode]: https://github.com/nsf/gocode
 [godef]: https://github.com/Manishearth/godef
 [kak-ycmd]: https://github.com/mawww/kak-ycmd
-[ccoc]: https://github.com/Valloric/ycmd/blob/master/CODE_OF_CONDUCT.md
-[dev-setup]: https://github.com/Valloric/ycmd/blob/master/DEV_SETUP.md
-[test-setup]: https://github.com/Valloric/ycmd/blob/master/TESTS.md
-[extra-conf-vim-data-doc]: https://github.com/Valloric/YouCompleteMe#the-gycm_extra_conf_vim_data-option
+[ccoc]: https://github.com/davits/ycmd/blob/master/CODE_OF_CONDUCT.md
+[dev-setup]: https://github.com/davits/ycmd/blob/master/DEV_SETUP.md
+[test-setup]: https://github.com/davits/ycmd/blob/master/TESTS.md
+[extra-conf-vim-data-doc]: https://github.com/davits/YouCompleteMe#the-gycm_extra_conf_vim_data-option
 [vscode-you-complete-me]: https://marketplace.visualstudio.com/items?itemName=RichardHe.you-complete-me
 [gycm]: https://github.com/jakeanq/gycm
 [nano-ycmd]: https://github.com/orsonteodoro/nano-ycmd
