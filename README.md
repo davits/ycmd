@@ -2,7 +2,7 @@ ycmd: a
 ==============================================
 
 [![Build Status](https://travis-ci.org/davits/ycmd.svg?branch=master)](https://travis-ci.org/davits/ycmd)
-[![Build status](https://ci.appveyor.com/api/projects/status/6fetp5xwb0kkuv2w/branch/master?svg=true)](https://ci.appveyor.com/project/davits/ycmd)
+[![Build status](https://ci.appveyor.com/api/projects/status/odca299ax2pfqie4?svg=true)](https://ci.appveyor.com/project/davits/ycmd)
 [![Coverage Status](https://codecov.io/gh/davits/ycmd/branch/master/graph/badge.svg)](https://codecov.io/gh/davits/ycmd)
 
 ycmd is a server that provides APIs for code-completion and other
