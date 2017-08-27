@@ -146,8 +146,19 @@ def CheckCall( args, **kwargs ):
     sys.exit( error.returncode )
 
 
+def GetGlobalPythonPrefix():
+  # In a virtualenv, sys.real_prefix points to the parent Python prefix.
+  if hasattr( sys, 'real_prefix' ):
+    return sys.real_prefix
+  # In a pyvenv (only available on Python 3), sys.base_prefix points to the
+  # parent Python prefix. Outside a pyvenv, it is equal to sys.prefix.
+  if PY_MAJOR >= 3:
+    return sys.base_prefix
+  return sys.prefix
+
+
 def GetPossiblePythonLibraryDirectories():
-  prefix = sys.base_prefix if PY_MAJOR >= 3 else sys.prefix
+  prefix = GetGlobalPythonPrefix()
 
   if OnWindows():
     return [ p.join( prefix, 'libs' ) ]
@@ -514,6 +525,7 @@ def Main():
   args = ParseArguments()
   ExitIfYcmdLibInUseOnWindows()
   BuildYcmdLib( args )
+  WritePythonUsedDuringBuild()
   if args.omnisharp_completer or args.all_completers:
     BuildOmniSharp()
   if args.gocode_completer or args.all_completers:
@@ -522,7 +534,6 @@ def Main():
     SetUpTern()
   if args.racer_completer or args.all_completers:
     BuildRacerd()
-  WritePythonUsedDuringBuild()
 
 
 if __name__ == '__main__':

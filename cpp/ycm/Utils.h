@@ -32,7 +32,7 @@ bool AlmostEqual( double a, double b );
 
 // Reads the entire contents of the specified file. If the file does not exist,
 // an exception is thrown.
-std::vector< std::string > ReadUtf8File( const fs::path &filepath );
+std::string ReadUtf8File( const fs::path &filepath );
 
 // Writes the entire contents of the specified file. If the file does not exist,
 // an exception is thrown.
@@ -87,6 +87,7 @@ YCM_DLL_EXPORT bool IsLowercase( char letter );
 YCM_DLL_EXPORT bool IsLowercase( const std::string &text );
 YCM_DLL_EXPORT bool IsUppercase( char letter );
 YCM_DLL_EXPORT char Lowercase( char letter );
+YCM_DLL_EXPORT std::string Lowercase( const std::string &text );
 YCM_DLL_EXPORT char Uppercase( char letter );
 YCM_DLL_EXPORT bool HasUppercase( const std::string &text );
 YCM_DLL_EXPORT char SwapCase( char letter );

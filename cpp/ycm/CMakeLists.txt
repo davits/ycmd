@@ -206,7 +206,7 @@ if ( APPLE )
 endif()
 
 if ( USE_SYSTEM_BOOST )
-  set( Boost_COMPONENTS filesystem system )
+  set( Boost_COMPONENTS filesystem regex system )
   if( USE_PYTHON2 )
     list( APPEND Boost_COMPONENTS python )
   else()
@@ -279,6 +279,8 @@ if ( EXTERNAL_LIBCLANG_PATH OR USE_SYSTEM_LIBCLANG )
     endif()
     # On Debian-based systems, llvm installs into /usr/lib/llvm-x.y.
     file( GLOB SYS_LLVM_PATHS "/usr/lib/llvm*/lib" )
+    # On FreeBSD , llvm install into /usr/local/llvm-xy
+    file ( GLOB FREEBSD_LLVM_PATHS "/usr/local/llvm*/lib")
     # Need TEMP because find_library does not work with an option variable
     # On Debian-based systems only a symlink to libclang.so.1 is created
     find_library( TEMP
@@ -290,6 +292,7 @@ if ( EXTERNAL_LIBCLANG_PATH OR USE_SYSTEM_LIBCLANG )
                   /usr/lib
                   /usr/lib/llvm
                   ${SYS_LLVM_PATHS}
+                  ${FREEBSD_LLVM_PATHS}
                   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib
                   /Library/Developer/CommandLineTools/usr/lib )
     set( EXTERNAL_LIBCLANG_PATH ${TEMP} )
@@ -321,7 +324,7 @@ if ( EXTRA_RPATH )
 endif()
 
 # Needed on Linux machines, but not on Macs and OpenBSD
-if ( UNIX AND NOT ( APPLE OR SYSTEM_IS_OPENBSD ) )
+if ( UNIX AND NOT ( APPLE OR SYSTEM_IS_OPENBSD OR HAIKU ) )
   set( EXTRA_LIBS rt )
 endif()
 
@@ -465,5 +468,9 @@ if( SYSTEM_IS_OPENBSD OR SYSTEM_IS_FREEBSD )
   set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread" )
 endif()
 
-add_subdirectory( tests )
-add_subdirectory( benchmarks )
+if ( DEFINED ENV{YCM_TESTRUN} )
+  add_subdirectory( tests )
+endif()
+if ( DEFINED ENV{YCM_BENCHMARK} )
+  add_subdirectory( benchmarks )
+endif()
