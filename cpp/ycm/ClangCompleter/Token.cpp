@@ -21,113 +21,205 @@ namespace YouCompleteMe {
 
 namespace {
 
-// Since cursor kind is a CXCursor_VarDecl we can't just check for the
-// storage class, because global static variables will be selected too.
-// Instead we just check if the semantic parent is a class or struct.
-// Luke, I am your father
-Token::Type getVariableType( const CXCursor &cursor ) {
+bool isStaticVariable( const CXCursor &cursor ) {
   CXCursor parent = clang_getCursorSemanticParent( cursor );
   CXCursorKind kind = clang_getCursorKind( parent );
   // Since cursor is a declaration, its parent should be a declaration too.
-  switch ( kind ) {
-    case CXCursor_ClassDecl:
-    case CXCursor_StructDecl:
-      return Token::STATIC_MEMBER_VARIABLE;
-    case CXCursor_Namespace:
-    case CXCursor_TranslationUnit:
-      return Token::GLOBAL_VARIABLE;
-    default:
-      return Token::VARIABLE;
-  }
+  return kind == CXCursor_ClassDecl || CXCursor_StructDecl;
 }
 
-bool hasStaticStorage( const CXCursor &cursor ) {
-  return clang_Cursor_getStorageClass( cursor ) == CX_SC_Static;
+bool isConstVariable( const CXCursor &cursor ) {
+  CXType type = clang_getCursorType( cursor );
+  CXType real_type = clang_getCanonicalType( type );
+  return clang_isConstQualifiedType( real_type );
+}
+
+bool isVirtualMethod( const CXCursor &cursor ) {
+  return clang_CXXMethod_isVirtual( cursor ) ||
+         clang_CXXMethod_isPureVirtual( cursor );
+}
+
+} // unnamed namespace
+
+Token::Token()
+  : kind( Token::Kind::IDENTIFIER )
+  , scope( Scope::NONE )
+  , type( Token::Type::UNSUPPORTED )
+  , range()
+  , modifiers() {
+}
+
+Token::Token( const CXTokenKind cx_kind, const CXSourceRange &cx_range,
+              const CXCursor &cx_cursor )
+  : scope( Scope::NONE )
+  , type( Type::UNSUPPORTED )
+  , range( cx_range )
+  , modifiers() {
+  initialize( cx_kind, cx_cursor );
+}
+
+bool Token::operator==( const Token &other ) const {
+  return kind == other.kind &&
+         type == other.type &&
+         scope == other.scope &&
+         range == other.range;
+}
+
+void Token::initialize( const CXTokenKind cx_kind,
+                        const CXCursor &cx_cursor ) {
+  switch ( cx_kind ) {
+    case CXToken_Punctuation:
+      kind = Kind::PUNCTUATION;
+      type = Type::PUNCTUATION;
+      break;
+
+    case CXToken_Comment:
+      kind = Kind::COMMENT;
+      type = Type::COMMENT;
+      break;
+
+    case CXToken_Keyword:
+      kind = Kind::KEYWORD;
+      type = Type::KEYWORD;
+      break;
+
+    case CXToken_Literal:
+      kind = Kind::LITERAL;
+      MapTypeAndScope( cx_cursor );
+      break;
+
+    case CXToken_Identifier:
+      kind = Kind::IDENTIFIER;
+      MapTypeAndScope( cx_cursor );
+      break;
+  }
 }
 
 // This is a recursive function.
 // Recursive call is made for the reference cursor kind,
 // with the referenced cursor as an argument,
 // therefore recursion level should not exceed 2.
-Token::Type CXCursorToTokenType( const CXCursor &cursor ) {
+void Token::MapTypeAndScope( const CXCursor &cursor ) {
   CXCursorKind kind = clang_getCursorKind( cursor );
 
   switch ( kind ) {
     case CXCursor_IntegerLiteral:
-      return Token::INTEGER;
+      type = Type::INTEGER;
+      break;
 
     case CXCursor_FloatingLiteral:
-      return Token::FLOATING;
+      type = Type::FLOATING;
+      break;
 
     case CXCursor_ImaginaryLiteral:
-      return Token::IMAGINARY;
+      type = Type::IMAGINARY;
+      break;
 
     case CXCursor_StringLiteral:
-      return Token::STRING;
+      type = Type::STRING;
+      break;
 
     case CXCursor_CharacterLiteral:
-      return Token::CHARACTER;
+      type = Type::CHARACTER;
+      break;
 
     case CXCursor_Namespace:
     case CXCursor_NamespaceAlias:
     case CXCursor_NamespaceRef:
-      return Token::NAMESPACE;
+      type = Type::NAMESPACE;
+      MapScope( cursor );
+      break;
 
     case CXCursor_ClassDecl:
     case CXCursor_ClassTemplate:
-      return Token::CLASS;
+      type = Type::CLASS;
+      MapScope( cursor );
+      break;
 
     case CXCursor_StructDecl:
-      return Token::STRUCTURE;
+      type = Type::STRUCT;
+      MapScope( cursor );
+      break;
 
     case CXCursor_UnionDecl:
-      return Token::UNION;
+      type = Type::UNION;
+      MapScope( cursor );
+      break;
 
     case CXCursor_TypedefDecl: // typedef
     case CXCursor_TypeAliasDecl: // using
-      return Token::TYPE_ALIAS;
+      type = Type::TYPE_ALIAS;
+      break;
 
     case CXCursor_FieldDecl:
-      return Token::MEMBER_VARIABLE;
+      type = Type::VARIABLE;
+      MapScope( cursor );
+      if ( clang_CXXField_isMutable( cursor ) ) {
+        modifiers.push_back( Modifier::MUTABLE );
+      } else if ( isConstVariable( cursor ) ) {
+        modifiers.push_back( Modifier::CONST );
+      }
+      break;
 
-    // Clang reports static member variables as plain variables
-    // not sure if it is a bug or feature
     case CXCursor_VarDecl:
-      return getVariableType( cursor );
-
-    case CXCursor_Constructor:
-    case CXCursor_Destructor:
-      return Token::MEMBER_FUNCTION;
+      //scope = getVariableType( cursor );
+      type = Type::VARIABLE;
+      MapScope( cursor );
+      // Clang reports static member variables as plain variables
+      // not sure if it is a bug or feature
+      if ( scope == Scope::CLASS || scope == Scope::STRUCT ) {
+        modifiers.push_back( Modifier::STATIC );
+      }
+      if ( isConstVariable( cursor ) ) {
+        modifiers.push_back( Modifier::CONST );
+      }
+      break;
 
     case CXCursor_CXXMethod:
-      return hasStaticStorage( cursor ) ? Token::STATIC_MEMBER_FUNCTION :
-                                          Token::MEMBER_FUNCTION;
-
+      if ( clang_CXXMethod_isStatic( cursor ) ) {
+        modifiers.push_back( Modifier::STATIC );
+      } else if ( isVirtualMethod( cursor ) ) {
+        modifiers.push_back( Modifier::VIRTUAL );
+      }
+      if ( clang_CXXMethod_isConst( cursor ) ) {
+        modifiers.push_back( Modifier::CONST );
+      }
+    case CXCursor_Constructor:
+    case CXCursor_Destructor:
     case CXCursor_FunctionDecl:
-      return Token::FUNCTION;
+      type = Type::FUNCTION;
+      MapScope( cursor );
+      break;
 
     case CXCursor_ParmDecl:
-      return Token::FUNCTION_PARAMETER;
+      type = Type::FUNCTION_PARAMETER;
+      break;
 
     case CXCursor_EnumDecl:
-      return Token::ENUMERATION;
+      type = Type::ENUMERATION;
+      break;
 
     case CXCursor_EnumConstantDecl:
-      return Token::ENUMERATOR;
+      type = Type::ENUMERATOR;
+      break;
 
     case CXCursor_TemplateTypeParameter:
-      return Token::TEMPLATE_PARAMETER;
+      type = Type::TEMPLATE_PARAMETER;
+      break;
 
     case CXCursor_NonTypeTemplateParameter:
-      return Token::TEMPLATE_NON_TYPE_PARAMETER;
+      type = Type::TEMPLATE_NON_TYPE_PARAMETER;
+      break;
 
     case CXCursor_PreprocessingDirective:
-      return Token::PREPROCESSING_DIRECTIVE;
+      type = Type::PREPROCESSING_DIRECTIVE;
+      break;
 
     case CXCursor_MacroDefinition:
     //case CXCursor_MacroExpansion: // Same as CXCursor_MacroInstantiation
     case CXCursor_MacroInstantiation:
-      return Token::MACRO;
+      type = Type::MACRO;
+      break;
 
     // When we have a type reference we need to do one more step
     // to find out what it is referencing.
@@ -138,65 +230,40 @@ Token::Type CXCursorToTokenType( const CXCursor &cursor ) {
     case CXCursor_MemberRef:
     case CXCursor_VariableRef: {
       CXCursor ref = clang_getCursorReferenced( cursor );
-
-      if ( clang_Cursor_isNull( ref ) ) {
-        return Token::UNSUPPORTED;
-      } else {
-        return CXCursorToTokenType( ref );
+      if ( !clang_Cursor_isNull( ref ) ) {
+        MapTypeAndScope( ref );
       }
+      break;
     }
 
     default:
-      return Token::UNSUPPORTED;
+      type = Type::UNSUPPORTED;
+      break;
   }
 }
 
-} // unnamed namespace
-
-Token::Token()
-  : kind( Token::IDENTIFIER )
-  , type( Token::UNSUPPORTED )
-  , range() {
-}
-
-Token::Token( const CXTokenKind cx_kind, const CXSourceRange &cx_range,
-              const CXCursor &cx_cursor )
-  : range( cx_range ) {
-  MapKindAndType( cx_kind, cx_cursor );
-}
-
-bool Token::operator==( const Token &other ) const {
-  return kind == other.kind &&
-         type == other.type &&
-         range == other.range;
-}
-
-void Token::MapKindAndType( const CXTokenKind cx_kind,
-                            const CXCursor &cx_cursor ) {
-  switch ( cx_kind ) {
-    case CXToken_Punctuation:
-      kind = Token::PUNCTUATION;
-      type = Token::PUNCTUATION_TYPE;
+void Token::MapScope( const CXCursor &cursor ) {
+  CXCursor parent = clang_getCursorSemanticParent( cursor );
+  CXCursorKind kind = clang_getCursorKind( parent );
+  // Since cursor is a declaration, its parent should be a declaration too.
+  switch ( kind ) {
+    case CXCursor_TranslationUnit:
+      scope = Scope::TRANSLATION_UNIT;
       break;
-
-    case CXToken_Comment:
-      kind = Token::COMMENT;
-      type = Token::COMMENT_TYPE;
+    case CXCursor_Namespace:
+      scope = Scope::NAMESPACE;
       break;
-
-    case CXToken_Keyword:
-      kind = Token::KEYWORD;
-      type = Token::KEYWORD_TYPE;
+    case CXCursor_ClassDecl:
+      scope = Scope::CLASS;
       break;
-
-    case CXToken_Literal:
-      kind = Token::LITERAL;
-      type = CXCursorToTokenType( cx_cursor );
+    case CXCursor_StructDecl:
+      scope = Scope::STRUCT;
       break;
-
-    case CXToken_Identifier:
-      kind = Token::IDENTIFIER;
-      type = CXCursorToTokenType( cx_cursor );
+    case CXCursor_UnionDecl:
+      scope = Scope::UNION;
+      break;
+    default:
+      scope = Scope::FUNCTION;
       break;
   }
 }

@@ -144,7 +144,9 @@ def GetSemanticTokens():
   request_data = request.json
   completer = _server_state.GetFiletypeCompleter( request_data[ 'filetypes' ] )
 
-  return _JsonResponse( completer.GetSemanticTokens( request_data ) )
+  response =  completer.GetSemanticTokens( request_data )
+  _logger.info(str(response))
+  return _JsonResponse(response)
 
 
 @app.post( '/skipped_ranges' )

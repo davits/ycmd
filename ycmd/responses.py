@@ -223,12 +223,19 @@ def BuildDiagnosticData( diagnostic ):
 def BuildSemanticTokenData( token ):
   kind = ( token.kind.name if hasattr( token.kind, 'name' )
            else token.kind )
+  scope = ( token.scope.name if hasattr( token.scope, 'name' )
+            else token.scope )
   token_type = ( token.type.name if hasattr( token.type, 'name' )
                  else token.type )
+  mv = ( token.modifiers.name if hasattr( token.modifiers, 'name' )
+         else token.modifiers )
+  modifiers = [ str( x ) for x in mv ]
   return {
     'kind': kind,
+    'scope': scope,
     'type': token_type,
-    'range': BuildRangeData( token.range )
+    'range': BuildRangeData( token.range ),
+    'modifiers': modifiers,
   }
 
 

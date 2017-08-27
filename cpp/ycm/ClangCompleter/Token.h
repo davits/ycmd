@@ -21,6 +21,7 @@
 #include "Range.h"
 
 #include <string>
+#include <vector>
 
 #include <clang-c/Index.h>
 
@@ -30,25 +31,33 @@ namespace YouCompleteMe {
 /// to the clang's CXTokenKind and CXCursorKind enums.
 struct Token {
 
-  enum Kind {
+  enum class Kind {
     PUNCTUATION = 0,
     COMMENT,
     KEYWORD,
     LITERAL,
-    IDENTIFIER
+    IDENTIFIER,
   };
 
-  // Divided into groups of possible values for each Kind enum value.
-  // TODO change to enum class and remove _TYPE suffixes after switch to C++11
-  enum Type {
+  enum class Scope {
+    NONE,
+    TRANSLATION_UNIT,
+    NAMESPACE,
+    CLASS,
+    STRUCT,
+    UNION,
+    FUNCTION,
+  };
+
+  enum class Type {
     // Punctuation types
-    PUNCTUATION_TYPE = 0,
+    PUNCTUATION = 0,
 
     // Comment types
-    COMMENT_TYPE,
+    COMMENT,
 
     // Keyword types
-    KEYWORD_TYPE,
+    KEYWORD,
 
     // Literal types
     // true/false are keywords
@@ -61,15 +70,10 @@ struct Token {
     // Identifier types
     NAMESPACE,
     CLASS,
-    STRUCTURE,
+    STRUCT,
     UNION,
     TYPE_ALIAS,
-    MEMBER_VARIABLE,
-    STATIC_MEMBER_VARIABLE,
-    GLOBAL_VARIABLE,
     VARIABLE,
-    MEMBER_FUNCTION,
-    STATIC_MEMBER_FUNCTION,
     FUNCTION,
     FUNCTION_PARAMETER,
     ENUMERATION,
@@ -83,6 +87,13 @@ struct Token {
     UNSUPPORTED
   };
 
+  enum class Modifier {
+    STATIC,
+    VIRTUAL,
+    CONST,
+    MUTABLE,
+  };
+
   Token();
 
   Token( const CXTokenKind kind, const CXSourceRange &tokenRange,
@@ -92,13 +103,21 @@ struct Token {
 
   Kind kind;
 
+  Scope scope;
+
   Type type;
 
   Range range;
 
+  std::vector< Modifier > modifiers;
+
 private:
 
-  void MapKindAndType( const CXTokenKind kind, const CXCursor &cursor );
+  void initialize( const CXTokenKind kind, const CXCursor &cursor );
+
+  void MapTypeAndScope( const CXCursor &cursor );
+
+  void MapScope( const CXCursor &cursor );
 
 };
 
