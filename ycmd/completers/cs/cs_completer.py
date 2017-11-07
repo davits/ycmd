@@ -42,7 +42,7 @@ from ycmd import utils
 
 SERVER_NOT_FOUND_MSG = ( 'OmniSharp server binary not found at {0}. ' +
                          'Did you compile it? You can do so by running ' +
-                         '"./install.py --omnisharp-completer".' )
+                         '"./install.py --cs-completer".' )
 INVALID_FILE_MESSAGE = 'File is invalid.'
 NO_DIAGNOSTIC_MESSAGE = 'No diagnostic for current line!'
 PATH_TO_OMNISHARP_BINARY = os.path.abspath(
@@ -398,12 +398,12 @@ class CsharpSolutionCompleter( object ):
       if self._ServerIsRunning():
         self._logger.info( 'Stopping OmniSharp server with PID {0}'.format(
                                self._omnisharp_phandle.pid ) )
-        self._GetResponse( '/stopserver' )
         try:
+          self._GetResponse( '/stopserver' )
           utils.WaitUntilProcessIsTerminated( self._omnisharp_phandle,
                                               timeout = 5 )
           self._logger.info( 'OmniSharp server stopped' )
-        except RuntimeError:
+        except Exception:
           self._logger.exception( 'Error while stopping OmniSharp server' )
 
       self._CleanUp()

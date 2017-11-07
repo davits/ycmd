@@ -63,7 +63,7 @@ LOGFILE_FORMAT = 'tern_{port}_{std}_'
 def ShouldEnableTernCompleter():
   """Returns whether or not the tern completer is 'installed'. That is whether
   or not the tern submodule has a 'node_modules' directory. This is pretty much
-  the only way we can know if the user added '--tern-completer' on
+  the only way we can know if the user added '--js-completer' on
   install or manually ran 'npm install' in the tern submodule directory."""
 
   if not PATH_TO_NODE:
@@ -247,7 +247,7 @@ class TernCompleter( Completer ):
     # empty request just containing the file data
     try:
       self._PostRequest( {}, request_data )
-    except:
+    except Exception:
       # The server might not be ready yet or the server might not be running.
       # in any case, just ignore this we'll hopefully get another parse request
       # soon.
@@ -480,10 +480,12 @@ class TernCompleter( Completer ):
     self._server_handle = None
     self._server_port = None
     if not self._server_keep_logfiles:
-      utils.RemoveIfExists( self._server_stdout )
-      self._server_stdout = None
-      utils.RemoveIfExists( self._server_stderr )
-      self._server_stderr = None
+      if self._server_stdout:
+        utils.RemoveIfExists( self._server_stdout )
+        self._server_stdout = None
+      if self._server_stderr:
+        utils.RemoveIfExists( self._server_stderr )
+        self._server_stderr = None
 
 
   def _ServerIsRunning( self ):
