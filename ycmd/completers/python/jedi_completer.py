@@ -42,12 +42,13 @@ import os
 
 HMAC_SECRET_LENGTH = 16
 JEDIHTTP_HMAC_HEADER = 'x-jedihttp-hmac'
+JEDIHTTP_IDLE_SUICIDE_SECONDS = 1800  # 30 minutes
 BINARY_NOT_FOUND_MESSAGE = ( 'The specified python interpreter {0} ' +
                              'was not found. Did you specify it correctly?' )
 LOGFILE_FORMAT = 'jedihttp_{port}_{std}_'
 PATH_TO_JEDIHTTP = os.path.abspath(
   os.path.join( os.path.dirname( __file__ ), '..', '..', '..',
-                'third_party', 'JediHTTP', 'jedihttp.py' ) )
+                'third_party', 'JediHTTP', 'jedihttp' ) )
 
 
 class JediCompleter( Completer ):
@@ -130,12 +131,12 @@ class JediCompleter( Completer ):
       if self._ServerIsRunning():
         self._logger.info( 'Stopping JediHTTP server with PID {0}'.format(
                                self._jedihttp_phandle.pid ) )
-        self._jedihttp_phandle.terminate()
         try:
+          self._GetResponse( '/shutdown' )
           utils.WaitUntilProcessIsTerminated( self._jedihttp_phandle,
                                               timeout = 5 )
           self._logger.info( 'JediHTTP server stopped' )
-        except RuntimeError:
+        except Exception:
           self._logger.exception( 'Error while stopping JediHTTP server' )
 
       self._CleanUp()
@@ -145,10 +146,12 @@ class JediCompleter( Completer ):
     self._jedihttp_phandle = None
     self._jedihttp_port = None
     if not self._keep_logfiles:
-      utils.RemoveIfExists( self._logfile_stdout )
-      self._logfile_stdout = None
-      utils.RemoveIfExists( self._logfile_stderr )
-      self._logfile_stderr = None
+      if self._logfile_stdout:
+        utils.RemoveIfExists( self._logfile_stdout )
+        self._logfile_stdout = None
+      if self._logfile_stderr:
+        utils.RemoveIfExists( self._logfile_stderr )
+        self._logfile_stderr = None
 
 
   def _StartServer( self ):
@@ -165,11 +168,13 @@ class JediCompleter( Completer ):
         json.dump( { 'hmac_secret': ToUnicode(
                         b64encode( self._hmac_secret ) ) },
                    hmac_file )
-        command = [ self._python_binary_path,
-                    PATH_TO_JEDIHTTP,
-                    '--port', str( self._jedihttp_port ),
-                    '--log', self._GetLoggingLevel(),
-                    '--hmac-file-secret', hmac_file.name ]
+        command = [
+          self._python_binary_path,
+          PATH_TO_JEDIHTTP,
+          '--port', str( self._jedihttp_port ),
+          '--log', self._GetLoggingLevel(),
+          '--hmac-file-secret', hmac_file.name,
+          '--idle-suicide-seconds', str( JEDIHTTP_IDLE_SUICIDE_SECONDS ) ]
 
       self._logfile_stdout = utils.CreateLogfile(
           LOGFILE_FORMAT.format( port = self._jedihttp_port, std = 'stdout' ) )

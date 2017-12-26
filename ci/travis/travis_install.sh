@@ -3,6 +3,11 @@
 # Exit immediately if a command returns a non-zero status.
 set -e
 
+# RVM overrides the cd, popd, and pushd shell commands, causing the
+# "shell_session_update: command not found" error on macOS when executing those
+# commands.
+unset -f cd popd pushd
+
 ####################
 # OS-specific setup
 ####################
@@ -61,7 +66,7 @@ pip install -U pip wheel setuptools
 pip install -r test_requirements.txt
 
 # Enable coverage for Python subprocesses. See:
-# http://coverage.readthedocs.org/en/coverage-4.0.3/subprocess.html
+# http://coverage.readthedocs.io/en/latest/subprocess.html
 echo -e "import coverage\ncoverage.process_startup()" > \
   ${PYENV_ROOT}/versions/${PYENV_VERSION}/lib/python${YCMD_PYTHON_VERSION}/site-packages/sitecustomize.py
 

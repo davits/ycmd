@@ -44,7 +44,17 @@ def DebugInfo_test( app ):
         'address': instance_of( str ),
         'port': instance_of( int ),
         'logfiles': contains( instance_of( str ),
-                              instance_of( str ) )
+                              instance_of( str ) ),
+        'extras': contains(
+          has_entries( {
+            'key': 'configuration file',
+            'value': instance_of( str )
+          } ),
+          has_entries( {
+            'key': 'working directory',
+            'value': instance_of( str )
+          } )
+        ),
       } ) ),
       'items': empty()
     } ) )

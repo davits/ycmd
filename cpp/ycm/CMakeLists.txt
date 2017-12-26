@@ -30,46 +30,51 @@ if ( USE_CLANG_COMPLETER AND
      NOT PATH_TO_LLVM_ROOT AND
      NOT EXTERNAL_LIBCLANG_PATH )
 
-  set( CLANG_VERSION 5.0.0 )
+  set( CLANG_VERSION 5.0.1 )
 
   if ( APPLE )
     set( CLANG_DIRNAME "clang+llvm-${CLANG_VERSION}-x86_64-apple-darwin" )
     set( CLANG_SHA256
-         "326be172ccb61210c9ae5dced27204977e249ec6589521cc30f82fd0904b0671" )
+         "c5b105c4960619feb32641ef051fa39ecb913cc0feb6bacebdfa71f8d3cae277" )
     set( CLANG_FILENAME "${CLANG_DIRNAME}.tar.xz" )
   elseif ( WIN32 )
     if( 64_BIT_PLATFORM )
       set( CLANG_DIRNAME "LLVM-${CLANG_VERSION}-win64" )
       set( CLANG_SHA256
-           "2b93843bd15623dc0e1bb52af85f2c0b41a89b6c1e613e6e6bd0da597c2639eb" )
+           "981543611d719624acb29a2cffd6a479cff36e8ab5ee8a57d8eca4f9c4c6956f" )
     else()
       set( CLANG_DIRNAME "LLVM-${CLANG_VERSION}-win32" )
       set( CLANG_SHA256
-           "b7a7565680d3aad66c17f789c115b738be4af3bc16e2589923f7a940f32439f6" )
+           "5de70ab482edb2da7ac20126dc58e23a691498aa644ca23a7b10c32c9ee62157" )
     endif()
     set( CLANG_FILENAME "${CLANG_DIRNAME}.exe" )
-  elseif ( CMAKE_SYSTEM_NAME MATCHES "FreeBSD" )
+  elseif ( SYSTEM_IS_FREEBSD )
     if ( 64_BIT_PLATFORM )
       set( CLANG_DIRNAME "clang+llvm-${CLANG_VERSION}-amd64-unknown-freebsd10" )
       set( CLANG_SHA256
-           "e55b646390da0a24e27f9761eecf0b31936483c9a3e84c12de0bb1a0d95bab6c" )
+           "86148b850e78aff743e7aaac337a3a94e9ad16d59ee6629a5ff699c31a73c55b" )
     else()
       set( CLANG_DIRNAME "clang+llvm-${CLANG_VERSION}-i386-unknown-freebsd10" )
       set( CLANG_SHA256
-           "2ea32ad7cd30d8e849113747b5bfda8e6eb0fb2f9b01cbe9eb61e884c0bd69eb" )
+           "dd87eef02657f186717118438a90386a3e4a865e36a1b9cf7953f392aead7dca" )
     endif()
     set( CLANG_FILENAME "${CLANG_DIRNAME}.tar.xz" )
   elseif ( CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*)" )
     set( CLANG_DIRNAME "clang+llvm-${CLANG_VERSION}-aarch64-linux-gnu" )
     set( CLANG_SHA256
-         "28545a43b6fdfa9b287f31b5186fe8a643eb77c585da638e9847a3d09564d362" )
+         "d2ad679b42b4b1eb0fc45d0a69d6a3cbd7dde5ca4c1e7d1d0f937a3177cb0817" )
+    set( CLANG_FILENAME "${CLANG_DIRNAME}.tar.xz" )
+  elseif ( CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm.*|ARM.*)" )
+    set( CLANG_DIRNAME "clang+llvm-${CLANG_VERSION}-armv7a-linux-gnueabihf" )
+    set( CLANG_SHA256
+         "9ef720ca1550edcede2e10214f4f46d7d1d40c5fb184027e82f449d8800dccc0" )
     set( CLANG_FILENAME "${CLANG_DIRNAME}.tar.xz" )
   else()
     if ( 64_BIT_PLATFORM )
       set( CLANG_DIRNAME
-           "clang+llvm-${CLANG_VERSION}-linux-x86_64-ubuntu14.04" )
+           "clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-14.04" )
       set( CLANG_SHA256
-           "58c1171f326108cfb7641441c5ede7846d58823bce3206c86a84c7ef7748860d" )
+           "9e61c6669991e2f0d065348c95917b2c6b697d75098b60ec1c2e9f17093ce012" )
     else()
       message( FATAL_ERROR
         "No prebuilt Clang ${CLANG_VERSION} binaries for 32-bit Linux. "
@@ -122,7 +127,8 @@ if ( USE_CLANG_COMPLETER AND
         "7-zip is needed to extract the files from the Clang installer. "
         "Install it and try again." )
     endif()
-    execute_process( COMMAND ${7Z_EXECUTABLE} x ${CLANG_FILENAME} OUTPUT_QUIET )
+    execute_process( COMMAND
+                     ${7Z_EXECUTABLE} -y x ${CLANG_FILENAME} OUTPUT_QUIET )
   else()
     execute_process( COMMAND tar -xzf ${CLANG_FILENAME} )
   endif()
@@ -204,7 +210,10 @@ endif()
 
 if ( USE_SYSTEM_BOOST )
   set( Boost_COMPONENTS filesystem regex system )
-  if( USE_PYTHON2 )
+  # Gentoo allows a very convenient system-wide python version switching
+  # that handles symlinks of everything needed, including Boost.Python.
+  # Thus, on Gentoo, we want to always link against boost_python.
+  if( USE_PYTHON2 OR DISTRIBUTION STREQUAL "Gentoo" )
     list( APPEND Boost_COMPONENTS python )
   else()
     list( APPEND Boost_COMPONENTS python3 )
@@ -278,6 +287,8 @@ if ( EXTERNAL_LIBCLANG_PATH OR USE_SYSTEM_LIBCLANG )
     file( GLOB SYS_LLVM_PATHS "/usr/lib/llvm*/lib" )
     # On FreeBSD , llvm install into /usr/local/llvm-xy
     file ( GLOB FREEBSD_LLVM_PATHS "/usr/local/llvm*/lib")
+    # On Gentoo, llvm installs into /usr/lib/llvm/x/
+    file ( GLOB GENTOO_LLVM_PATHS "/usr/lib*/llvm/*/lib*" )
     # Need TEMP because find_library does not work with an option variable
     # On Debian-based systems only a symlink to libclang.so.1 is created
     find_library( TEMP
@@ -290,6 +301,7 @@ if ( EXTERNAL_LIBCLANG_PATH OR USE_SYSTEM_LIBCLANG )
                   /usr/lib/llvm
                   ${SYS_LLVM_PATHS}
                   ${FREEBSD_LLVM_PATHS}
+                  ${GENTOO_LLVM_PATHS}
                   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib
                   /Library/Developer/CommandLineTools/usr/lib )
     set( EXTERNAL_LIBCLANG_PATH ${TEMP} )

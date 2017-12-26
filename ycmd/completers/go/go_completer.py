@@ -36,7 +36,7 @@ from ycmd.completers.completer import Completer
 
 BINARY_NOT_FOUND_MESSAGE = ( '{0} binary not found. Did you build it? '
                              'You can do so by running '
-                             '"./install.py --gocode-completer".' )
+                             '"./install.py --go-completer".' )
 SHELL_ERROR_MESSAGE = ( 'Command {command} failed with code {code} and error '
                         '"{error}".' )
 COMPUTE_OFFSET_ERROR_MESSAGE = ( 'Go completer could not compute byte offset '
@@ -235,14 +235,14 @@ class GoCompleter( Completer ):
       if self._ServerIsRunning():
         _logger.info( 'Stopping Gocode server with PID {0}'.format(
                           self._gocode_handle.pid ) )
-        self._ExecuteCommand( [ self._gocode_binary_path,
-                                '-sock', 'tcp',
-                                '-addr', self._gocode_host,
-                                'close' ] )
         try:
+          self._ExecuteCommand( [ self._gocode_binary_path,
+                                  '-sock', 'tcp',
+                                  '-addr', self._gocode_host,
+                                  'close' ] )
           utils.WaitUntilProcessIsTerminated( self._gocode_handle, timeout = 5 )
           _logger.info( 'Gocode server stopped' )
-        except RuntimeError:
+        except Exception:
           _logger.exception( 'Error while stopping Gocode server' )
 
       self._CleanUp()
