@@ -56,7 +56,7 @@ public:
 
   YCM_EXPORT bool IsCurrentlyUpdating() const;
 
-  std::vector< Diagnostic > Reparse(
+  YCM_EXPORT std::vector< Diagnostic > Reparse(
     const std::vector< UnsavedFile > &unsaved_files );
 
   YCM_EXPORT std::vector< CompletionData > CandidatesForLocation(
