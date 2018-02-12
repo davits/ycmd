@@ -658,12 +658,12 @@ def _GetCompilationInfoForFile( database, file_name, file_extension ):
 def UserIncludePaths( user_flags, filename ):
   quoted_include_paths = [ ( ToUnicode( os.path.dirname( filename ) ), False ) ]
   include_paths = []
-<<<<<<< HEAD
 
   if user_flags:
     include_flags = { '-iquote':  ( quoted_include_paths, False ),
                       '-I':       ( include_paths, False ),
                       '-isystem': ( include_paths, True ) }
+
     if _ShouldAllowWinStyleFlags( user_flags ):
       include_flags[ '/I' ] = ( include_paths, False )
 
