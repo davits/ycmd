@@ -262,6 +262,10 @@ class Completer( with_metaclass( abc.ABCMeta, object ) ):
     pass # pragma: no cover
 
 
+  def GetSignatureHints( self, request_data ):
+    return [] #pragma: no cover
+
+
   def DefinedSubcommands( self ):
     subcommands = sorted( self.GetSubcommandsMap().keys() )
     try:

@@ -231,8 +231,8 @@ std::vector< CompletionData > ToCompletionDataVector(
 
     CompletionData data( completion_result );
     size_t index = GetValueElseInsert( seen_data,
-                                     data.original_string_,
-                                     completions.size() );
+                                       data.original_string_,
+                                       completions.size() );
 
     if ( index == completions.size() ) {
       completions.push_back( std::move( data ) );
@@ -248,6 +248,29 @@ std::vector< CompletionData > ToCompletionDataVector(
     }
   }
 
+  return completions;
+}
+
+std::vector< CompletionData > ToSignatureHintsDataVector(
+  CXCodeCompleteResults *results ) {
+  std::vector< CompletionData > completions;
+
+  if ( !results || !results->Results ) {
+    return completions;
+  }
+  completions.reserve( results->NumResults );
+
+  for ( size_t i = 0; i < results->NumResults; ++i ) {
+    CXCompletionResult completion_result = results->Results[ i ];
+
+    if ( !CompletionStringAvailable( completion_result.CompletionString ) ) {
+      continue;
+    }
+    if ( completion_result.CursorKind == CXCursor_OverloadCandidate ) {
+      CompletionData data( completion_result );
+      completions.push_back( std::move( data ) );
+    }
+  }
   return completions;
 }
 

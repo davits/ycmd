@@ -126,6 +126,8 @@ BOOST_PYTHON_MODULE(ycm_core)
     .def( "UpdateTranslationUnit", &ClangCompleter::UpdateTranslationUnit )
     .def( "CandidatesForLocationInFile",
           &ClangCompleter::CandidatesForLocationInFile )
+    .def( "SignatureHintsForLocationInFile",
+          &ClangCompleter::SignatureHintsForLocationInFile )
     .def( "GetTypeAtLocation", &ClangCompleter::GetTypeAtLocation )
     .def( "GetEnclosingFunctionAtLocation",
           &ClangCompleter::GetEnclosingFunctionAtLocation )
@@ -147,6 +149,7 @@ BOOST_PYTHON_MODULE(ycm_core)
     .value( "MACRO", CompletionKind::MACRO )
     .value( "PARAMETER", CompletionKind::PARAMETER )
     .value( "NAMESPACE", CompletionKind::NAMESPACE )
+    .value( "OVERLOAD", CompletionKind::OVERLOAD )
     .value( "UNKNOWN", CompletionKind::UNKNOWN );
 
   class_< CompletionData >( "CompletionData" )

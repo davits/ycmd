@@ -125,6 +125,20 @@ def GetCompletions():
                                errors = errors ) )
 
 
+@app.post( '/signature_hints' )
+def GetSignatureHints():
+  _logger.debug( 'Received signature hints request' )
+  request_data = RequestWrap( request.json )
+  completer = _server_state.GetFiletypeCompleter( request_data[ 'filetypes' ] )
+  hints = []
+  try:
+    hints = completer.GetSignatureHints( request_data )
+  except Exception:
+    pass
+
+  return _JsonResponse( hints )
+
+
 @app.post( '/filter_and_sort_candidates' )
 def FilterAndSortCandidates():
   _logger.info( 'Received filter & sort request' )

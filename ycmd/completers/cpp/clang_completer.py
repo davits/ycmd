@@ -165,6 +165,40 @@ class ClangCompleter( Completer ):
     return [ ConvertCompletionData( x ) for x in results ]
 
 
+  def GetSignatureHints( self, request_data ):
+    filename = request_data[ 'filepath' ]
+    if not filename:
+      return
+
+    includes = self.GetIncludePaths( request_data )
+    if includes is not None:
+      return includes
+
+    if self._completer.UpdatingTranslationUnit(
+        ToCppStringCompatible( filename ) ):
+      raise RuntimeError( PARSING_FILE_MESSAGE )
+
+    flags = self._FlagsForRequest( request_data )
+    if not flags:
+      raise RuntimeError( NO_COMPILE_FLAGS_MESSAGE )
+
+    files = self.GetUnsavedFilesVector( request_data )
+    line = request_data[ 'line_num' ]
+    column = request_data[ 'start_column' ]
+    with self._files_being_compiled.GetExclusive( filename ):
+      results = self._completer.SignatureHintsForLocationInFile(
+          ToCppStringCompatible( filename ),
+          line,
+          column,
+          files,
+          flags )
+
+    if not results:
+      return []
+
+    return [ ConvertCompletionData( x ) for x in results ]
+
+
   def GetSubcommandsMap( self ):
     return {
       'GoToDefinition'           : ( lambda self, request_data, args:

@@ -64,6 +64,11 @@ public:
     int column,
     const std::vector< UnsavedFile > &unsaved_files );
 
+  YCM_EXPORT std::vector< CompletionData > SignatureHintsForLocation(
+    int line,
+    int column,
+    const std::vector< UnsavedFile > &unsaved_files );
+
   YCM_EXPORT Location GetDeclarationLocation(
     int line,
     int column,

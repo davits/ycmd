@@ -34,6 +34,9 @@ using DiagnosticWrap =
 std::vector< CompletionData > ToCompletionDataVector(
   CXCodeCompleteResults *results );
 
+std::vector< CompletionData > ToSignatureHintsDataVector(
+  CXCodeCompleteResults *results );
+
 // NOTE: CXUnsavedFiles store pointers to data in UnsavedFiles, so UnsavedFiles
 // need to outlive CXUnsavedFiles!
 std::vector< CXUnsavedFile > ToCXUnsavedFiles(

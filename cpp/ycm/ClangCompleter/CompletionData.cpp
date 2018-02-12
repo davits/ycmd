@@ -72,6 +72,9 @@ CompletionKind CursorKindToCompletionKind( CXCursorKind kind ) {
     case CXCursor_NamespaceAlias:
       return CompletionKind::NAMESPACE;
 
+    case CXCursor_OverloadCandidate:
+      return CompletionKind::OVERLOAD;
+
     default:
       return CompletionKind::UNKNOWN;
   }
@@ -79,25 +82,30 @@ CompletionKind CursorKindToCompletionKind( CXCursorKind kind ) {
 
 
 bool IsMainCompletionTextInfo( CXCompletionChunkKind kind ) {
-  return
-    kind == CXCompletionChunk_Optional     ||
-    kind == CXCompletionChunk_TypedText    ||
-    kind == CXCompletionChunk_Placeholder  ||
-    kind == CXCompletionChunk_LeftParen    ||
-    kind == CXCompletionChunk_RightParen   ||
-    kind == CXCompletionChunk_RightBracket ||
-    kind == CXCompletionChunk_LeftBracket  ||
-    kind == CXCompletionChunk_LeftBrace    ||
-    kind == CXCompletionChunk_RightBrace   ||
-    kind == CXCompletionChunk_RightAngle   ||
-    kind == CXCompletionChunk_LeftAngle    ||
-    kind == CXCompletionChunk_Comma        ||
-    kind == CXCompletionChunk_Colon        ||
-    kind == CXCompletionChunk_SemiColon    ||
-    kind == CXCompletionChunk_Equal        ||
-    kind == CXCompletionChunk_Informative  ||
-    kind == CXCompletionChunk_HorizontalSpace ||
-    kind == CXCompletionChunk_Text;
+  switch ( kind ) {
+    case CXCompletionChunk_Optional:
+    case CXCompletionChunk_TypedText:
+    case CXCompletionChunk_Placeholder:
+    case CXCompletionChunk_LeftParen:
+    case CXCompletionChunk_RightParen:
+    case CXCompletionChunk_RightBracket:
+    case CXCompletionChunk_LeftBracket:
+    case CXCompletionChunk_LeftBrace:
+    case CXCompletionChunk_RightBrace:
+    case CXCompletionChunk_RightAngle:
+    case CXCompletionChunk_LeftAngle:
+    case CXCompletionChunk_Comma:
+    case CXCompletionChunk_Colon:
+    case CXCompletionChunk_SemiColon:
+    case CXCompletionChunk_Equal:
+    case CXCompletionChunk_Informative:
+    case CXCompletionChunk_HorizontalSpace:
+    case CXCompletionChunk_Text:
+    case CXCompletionChunk_CurrentParameter:
+      return true;
+    default:
+      return false;
+  }
 
 }
 
@@ -231,6 +239,11 @@ void CompletionData::ExtractDataFromChunk( CXCompletionString completion_string,
     if ( kind == CXCompletionChunk_Optional ) {
       everything_except_return_type_.append(
         OptionalChunkToString( completion_string, chunk_num ) );
+    } else if ( kind == CXCompletionChunk_CurrentParameter ) {
+      everything_except_return_type_
+        .append("<b>")
+        .append( ChunkToString( completion_string, chunk_num ) )
+        .append("</b>");
     } else {
       everything_except_return_type_.append(
         ChunkToString( completion_string, chunk_num ) );
@@ -243,6 +256,7 @@ void CompletionData::ExtractDataFromChunk( CXCompletionString completion_string,
       break;
 
     case CXCompletionChunk_Placeholder:
+    case CXCompletionChunk_CurrentParameter:
       saw_placeholder = true;
       break;
 
