@@ -1,6 +1,6 @@
 # encoding: utf-8
 #
-# Copyright (C) 2015 ycmd contributors
+# Copyright (C) 2015-2018 ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -29,14 +29,13 @@ import requests
 import ycm_core
 from nose.tools import eq_
 from hamcrest import ( assert_that, contains, contains_inanyorder, empty,
-                       has_item, has_items, has_entry, has_entries,
-                       contains_string )
+                       has_item, has_items, has_entry, has_entries )
 
 from ycmd.completers.cpp.clang_completer import NO_COMPLETIONS_MESSAGE
 from ycmd.responses import UnknownExtraConf, NoExtraConfDetected
 from ycmd.tests.clang import IsolatedYcmd, PathToTestFile, SharedYcmd
 from ycmd.tests.test_utils import ( BuildRequest, CompletionEntryMatcher,
-                                    ErrorMatcher, ExpectedFailure, WindowsOnly )
+                                    ErrorMatcher, WindowsOnly )
 from ycmd.utils import ReadFile
 
 NO_COMPLETIONS_ERROR = ErrorMatcher( RuntimeError, NO_COMPLETIONS_MESSAGE )
@@ -513,13 +512,15 @@ def GetCompletions_Include_ClientDataGivenToExtraConf_test( app ):
 
 @SharedYcmd
 @WindowsOnly
-def GetCompletions_ClangCLDriver_SimpleCompletion_test( app ):
+def GetCompletions_ClangCLDriverFlag_SimpleCompletion_test( app ):
   RunTest( app, {
     'description': 'basic completion with --driver-mode=cl',
-    'extra_conf': [ 'driver_mode_cl', '.ycm_extra_conf.py' ],
+    'extra_conf': [ 'driver_mode_cl', 'flag', '.ycm_extra_conf.py' ],
     'request': {
       'filetype': 'cpp',
-      'filepath': PathToTestFile( 'driver_mode_cl', 'driver_mode_cl.cpp' ),
+      'filepath': PathToTestFile( 'driver_mode_cl',
+                                  'flag',
+                                  'driver_mode_cl.cpp' ),
       'line_num': 8,
       'column_num': 18,
       'force_semantic': True,
@@ -540,13 +541,44 @@ def GetCompletions_ClangCLDriver_SimpleCompletion_test( app ):
 
 @SharedYcmd
 @WindowsOnly
-def GetCompletions_ClangCLDriver_IncludeStatementCandidate_test( app ):
+def GetCompletions_ClangCLDriverExec_SimpleCompletion_test( app ):
   RunTest( app, {
-    'description': 'Completion inside include statement with CL driver',
-    'extra_conf': [ 'driver_mode_cl', '.ycm_extra_conf.py' ],
+    'description': 'basic completion with --driver-mode=cl',
+    'extra_conf': [ 'driver_mode_cl', 'executable', '.ycm_extra_conf.py' ],
     'request': {
       'filetype': 'cpp',
-      'filepath': PathToTestFile( 'driver_mode_cl', 'driver_mode_cl.cpp' ),
+      'filepath': PathToTestFile( 'driver_mode_cl',
+                                  'executable',
+                                  'driver_mode_cl.cpp' ),
+      'line_num': 8,
+      'column_num': 18,
+      'force_semantic': True,
+    },
+    'expect': {
+      'response': requests.codes.ok,
+      'data': has_entries( {
+        'completion_start_column': 3,
+        'completions': contains_inanyorder(
+          CompletionEntryMatcher( 'driver_mode_cl_include_func', 'void' ),
+          CompletionEntryMatcher( 'driver_mode_cl_include_int', 'int' ),
+        ),
+        'errors': empty(),
+      } )
+    }
+  } )
+
+
+@SharedYcmd
+@WindowsOnly
+def GetCompletions_ClangCLDriverFlag_IncludeStatementCandidate_test( app ):
+  RunTest( app, {
+    'description': 'Completion inside include statement with CL driver',
+    'extra_conf': [ 'driver_mode_cl', 'flag', '.ycm_extra_conf.py' ],
+    'request': {
+      'filetype': 'cpp',
+      'filepath': PathToTestFile( 'driver_mode_cl',
+                                  'flag',
+                                  'driver_mode_cl.cpp' ),
       'line_num': 1,
       'column_num': 34,
     },
@@ -563,9 +595,33 @@ def GetCompletions_ClangCLDriver_IncludeStatementCandidate_test( app ):
   } )
 
 
-@ExpectedFailure( 'Filtering and sorting does not support candidates with '
-                  'non-ASCII characters.',
-                  contains_string( "value for 'completions' no item matches" ) )
+@SharedYcmd
+@WindowsOnly
+def GetCompletions_ClangCLDriverExec_IncludeStatementCandidate_test( app ):
+  RunTest( app, {
+    'description': 'Completion inside include statement with CL driver',
+    'extra_conf': [ 'driver_mode_cl', 'executable', '.ycm_extra_conf.py' ],
+    'request': {
+      'filetype': 'cpp',
+      'filepath': PathToTestFile( 'driver_mode_cl',
+                                  'executable',
+                                  'driver_mode_cl.cpp' ),
+      'line_num': 1,
+      'column_num': 34,
+    },
+    'expect': {
+      'response': requests.codes.ok,
+      'data': has_entries( {
+        'completion_start_column': 11,
+        'completions': contains_inanyorder(
+          CompletionEntryMatcher( 'driver_mode_cl_include.h', '[File]' ),
+        ),
+        'errors': empty(),
+      } )
+    }
+  } )
+
+
 @SharedYcmd
 def GetCompletions_UnicodeInLine_test( app ):
   RunTest( app, {
@@ -594,9 +650,6 @@ def GetCompletions_UnicodeInLine_test( app ):
   } )
 
 
-@ExpectedFailure( 'Filtering and sorting does not support candidates with '
-                  'non-ASCII characters.',
-                  contains_string( "value for 'completions' no item matches" ) )
 @SharedYcmd
 def GetCompletions_UnicodeInLineFilter_test( app ):
   RunTest( app, {
@@ -1037,4 +1090,57 @@ def GetCompletions_TranslateClangExceptionToPython_test( app ):
       'data': ErrorMatcher( ycm_core.ClangParseError,
                             "Failed to parse the translation unit." )
     },
+  } )
+
+
+@SharedYcmd
+def GetCompletions_Unity_test( app ):
+  RunTest( app, {
+    'description': 'Completion returns from file included in TU, but not in '
+                   'opened file',
+    'extra_conf': [ '.ycm_extra_conf.py' ],
+    'request': {
+      'filetype'  : 'cpp',
+      'filepath'  : PathToTestFile( 'unitya.cc' ),
+      'line_num'  : 10,
+      'column_num': 24,
+      'force_semantic': True,
+    },
+    'expect': {
+      'response': requests.codes.ok,
+      'data': has_entries( {
+        'completion_start_column': 20,
+        'completions': contains(
+          CompletionEntryMatcher( 'this_is_an_it', 'int' ),
+        ),
+        'errors': empty(),
+      } )
+    }
+  } )
+
+
+@SharedYcmd
+def GetCompletions_UnityInclude_test( app ):
+  RunTest( app, {
+    'description': 'Completion returns for includes in unity setup',
+    'extra_conf': [ '.ycm_extra_conf.py' ],
+    'request': {
+      'filetype'  : 'cpp',
+      'filepath'  : PathToTestFile( 'unitya.cc' ),
+      'line_num'  : 1,
+      'column_num': 17,
+      'force_semantic': True,
+    },
+    'expect': {
+      'response': requests.codes.ok,
+      'data': has_entries( {
+        'completion_start_column': 11,
+        'completions': has_items(
+          CompletionEntryMatcher( 'unity.h', '[File]' ),
+          CompletionEntryMatcher( 'unity.cc', '[File]' ),
+          CompletionEntryMatcher( 'unitya.cc', '[File]' ),
+        ),
+        'errors': empty(),
+      } )
+    }
   } )

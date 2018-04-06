@@ -130,6 +130,13 @@ def LocationMatcher( filepath, line_num, column_num ):
   } )
 
 
+def RangeMatcher( filepath, start, end ):
+  return has_entries( {
+    'start': LocationMatcher( filepath, *start ),
+    'end': LocationMatcher( filepath, *end ),
+  } )
+
+
 def ChunkMatcher( replacement_text, start, end ):
   return has_entries( {
     'replacement_text': replacement_text,
@@ -319,3 +326,25 @@ def TemporaryTestDir():
     yield tmp_dir
   finally:
     shutil.rmtree( tmp_dir )
+
+
+def WithRetry( test ):
+  """Decorator to be applied to tests that retries the test over and over
+  until it passes or |timeout| seconds have passed."""
+
+  if 'YCM_TEST_NO_RETRY' in os.environ:
+    return test
+
+  @functools.wraps( test )
+  def wrapper( *args, **kwargs ):
+    expiry = time.time() + 30
+    while True:
+      try:
+        test( *args, **kwargs )
+        return
+      except Exception as test_exception:
+        if time.time() > expiry:
+          raise
+        print( 'Test failed, retrying: {0}'.format( str( test_exception ) ) )
+        time.sleep( 0.25 )
+  return wrapper

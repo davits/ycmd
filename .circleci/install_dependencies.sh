@@ -12,19 +12,18 @@ set -e
 brew update || brew update
 
 # List of homebrew formulae to install in the order they appear.
-# We require CMake, Node, Go, Mono and Ninja for our build and tests, and all
+# We require CMake, Node, Go, and Mono for our build and tests, and all
 # the others are dependencies of pyenv.
 REQUIREMENTS="cmake
               node.js
               go
               mono
-              ninja
               readline
               autoconf
               pkg-config
               openssl"
 
-# Install CMake, Node, Go, Mono, Ninja, pyenv and dependencies.
+# Install CMake, Node, Go, Mono, pyenv and dependencies.
 for pkg in $REQUIREMENTS; do
   # Install package, or upgrade it if it is already installed.
   brew install $pkg || brew outdated $pkg || brew upgrade $pkg
@@ -50,11 +49,11 @@ PATH="${PYENV_ROOT}/bin:${PATH}"
 eval "$(pyenv init -)"
 
 if [ "${YCMD_PYTHON_VERSION}" == "2.7" ]; then
-  # We need a recent enough version of Python 2.7 on macOS or an error occurs
-  # when installing the psutil dependency for our tests.
-  PYENV_VERSION="2.7.14"
+  # Prior versions fail to compile with error "ld: library not found for
+  # -lSystemStubs"
+  PYENV_VERSION="2.7.2"
 else
-  PYENV_VERSION="3.4.7"
+  PYENV_VERSION="3.4.0"
 fi
 
 # In order to work with ycmd, python *must* be built as a shared library. The

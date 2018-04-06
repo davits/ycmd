@@ -1,4 +1,4 @@
-# Copyright (C) 2017 ycmd contributors
+# Copyright (C) 2017-2018 ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -28,7 +28,6 @@ import hashlib
 
 from ycmd.utils import ( ByteOffsetToCodepointOffset,
                          pathname2url,
-                         SplitLines,
                          ToBytes,
                          ToUnicode,
                          url2pathname,
@@ -106,6 +105,7 @@ class ServerFileState( object ):
     self.version = 0
     self.state = ServerFileState.CLOSED
     self.checksum = None
+    self.contents = ''
 
 
   def GetDirtyFileAction( self, contents ):
@@ -122,7 +122,7 @@ class ServerFileState( object ):
     else:
       action = ServerFileState.CHANGE_FILE
 
-    return self._SendNewVersion( new_checksum, action )
+    return self._SendNewVersion( new_checksum, action, contents )
 
 
   def GetSavedFileAction( self, contents ):
@@ -137,7 +137,9 @@ class ServerFileState( object ):
     if self.checksum.digest() == new_checksum.digest():
       return ServerFileState.NO_ACTION
 
-    return self._SendNewVersion( new_checksum, ServerFileState.CHANGE_FILE )
+    return self._SendNewVersion( new_checksum,
+                                 ServerFileState.CHANGE_FILE,
+                                 contents )
 
 
   def GetFileCloseAction( self ):
@@ -151,10 +153,11 @@ class ServerFileState( object ):
     return ServerFileState.NO_ACTION
 
 
-  def _SendNewVersion( self, new_checksum, action ):
+  def _SendNewVersion( self, new_checksum, action, contents ):
     self.checksum = new_checksum
     self.version = self.version + 1
     self.state = ServerFileState.OPEN
+    self.contents = contents
 
     return action
 
@@ -249,15 +252,14 @@ def DidCloseTextDocument( file_state ):
   } )
 
 
-def Completion( request_id, request_data ):
+def Completion( request_id, request_data, codepoint ):
   return BuildRequest( request_id, 'textDocument/completion', {
     'textDocument': {
       'uri': FilePathToUri( request_data[ 'filepath' ] ),
     },
-    'position': {
-      'line': request_data[ 'line_num' ] - 1,
-      'character': request_data[ 'start_codepoint' ] - 1,
-    }
+    'position': Position( request_data[ 'line_num' ],
+                          request_data[ 'line_value' ],
+                          codepoint ),
   } )
 
 
@@ -354,8 +356,7 @@ def FormattingOptions( request_data ):
 
 
 def Range( request_data ):
-  filepath = request_data[ 'filepath' ]
-  lines = SplitLines( request_data[ 'file_data' ][ filepath ][ 'contents' ] )
+  lines = request_data[ 'lines' ]
 
   start = request_data[ 'range' ][ 'start' ]
   start_line_num = start[ 'line_num' ]
@@ -380,6 +381,13 @@ def Range( request_data ):
     'start': Position( start_line_num, start_line_value, start_codepoint ),
     'end': Position( end_line_num, end_line_value, end_codepoint )
   }
+
+
+def ExecuteCommand( request_id, command, arguments ):
+  return BuildRequest( request_id, 'workspace/executeCommand', {
+    'command': command,
+    'arguments': arguments
+  } )
 
 
 def FilePathToUri( file_name ):

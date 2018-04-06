@@ -88,8 +88,8 @@ def SkippedRanges_test( app ):
   _SendReadyToParse( app )
   _RunTest( app,
             contains(
-              _BuildRangeData( 2, 2, 4, 7 ),
-              _BuildRangeData( 11, 2, 13, 7 ),
+              _BuildRangeData( 2, 1, 4, 7 ),
+              _BuildRangeData( 11, 1, 13, 7 ),
             ) )
 
 

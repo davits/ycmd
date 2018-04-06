@@ -20,6 +20,8 @@
 #include "ClangUtils.h"
 #include "ClangHelpers.h"
 
+#include <boost/filesystem.hpp>
+
 #include <cstdlib>
 #include <algorithm>
 #include <memory>
@@ -68,8 +70,7 @@ using CodeCompleteResultsWrap =
   shared_ptr< remove_pointer< CXCodeCompleteResults >::type >;
 
 TranslationUnit::TranslationUnit()
-  : filename_( "" ),
-    clang_translation_unit_( nullptr ) {
+  : clang_translation_unit_( nullptr ) {
 }
 
 TranslationUnit::TranslationUnit(
@@ -77,8 +78,7 @@ TranslationUnit::TranslationUnit(
   const std::vector< UnsavedFile > &unsaved_files,
   const std::vector< std::string > &flags,
   CXIndex clang_index )
-  : filename_( filename ),
-    clang_translation_unit_( nullptr ) {
+  : clang_translation_unit_( nullptr ) {
   std::vector< const char * > pointer_flags;
   pointer_flags.reserve( flags.size() );
 
@@ -148,6 +148,7 @@ std::vector< Diagnostic > TranslationUnit::Reparse(
 
 
 std::vector< CompletionData > TranslationUnit::CandidatesForLocation(
+  const std::string &filename,
   int line,
   int column,
   const std::vector< UnsavedFile > &unsaved_files ) {
@@ -174,7 +175,7 @@ std::vector< CompletionData > TranslationUnit::CandidatesForLocation(
 
   CodeCompleteResultsWrap results(
     clang_codeCompleteAt( clang_translation_unit_,
-                          filename_.c_str(),
+                          filename.c_str(),
                           line,
                           column,
                           const_cast<CXUnsavedFile *>( unsaved ),
@@ -187,27 +188,7 @@ std::vector< CompletionData > TranslationUnit::CandidatesForLocation(
   return candidates;
 }
 
-Location TranslationUnit::GetDeclarationLocation(
-  int line,
-  int column,
-  const std::vector< UnsavedFile > &unsaved_files,
-  bool reparse ) {
-  if ( reparse ) {
-    Reparse( unsaved_files );
-  }
-
-  unique_lock< mutex > lock( clang_access_mutex_ );
-
-  if ( !clang_translation_unit_ ) {
-    return Location();
-  }
-
-  CXCursor cursor = GetCursor( line, column );
-
-  if ( !CursorIsValid( cursor ) ) {
-    return Location();
-  }
-
+Location TranslationUnit::GetDeclarationLocationForCursor( CXCursor cursor ) {
   CXCursor referenced_cursor = clang_getCursorReferenced( cursor );
 
   if ( !CursorIsValid( referenced_cursor ) ) {
@@ -223,7 +204,8 @@ Location TranslationUnit::GetDeclarationLocation(
   return Location( clang_getCursorLocation( canonical_cursor ) );
 }
 
-Location TranslationUnit::GetDefinitionLocation(
+Location TranslationUnit::GetDeclarationLocation(
+  const std::string &filename,
   int line,
   int column,
   const std::vector< UnsavedFile > &unsaved_files,
@@ -238,12 +220,16 @@ Location TranslationUnit::GetDefinitionLocation(
     return Location();
   }
 
-  CXCursor cursor = GetCursor( line, column );
+  CXCursor cursor = GetCursor( filename, line, column );
 
   if ( !CursorIsValid( cursor ) ) {
     return Location();
   }
 
+  return GetDeclarationLocationForCursor( cursor );
+}
+
+Location TranslationUnit::GetDefinitionLocationForCursor( CXCursor cursor ) {
   CXCursor definition_cursor = clang_getCursorDefinition( cursor );
 
   if ( !CursorIsValid( definition_cursor ) ) {
@@ -253,7 +239,74 @@ Location TranslationUnit::GetDefinitionLocation(
   return Location( clang_getCursorLocation( definition_cursor ) );
 }
 
+Location TranslationUnit::GetDefinitionLocation(
+  const std::string &filename,
+  int line,
+  int column,
+  const std::vector< UnsavedFile > &unsaved_files,
+  bool reparse ) {
+  if ( reparse ) {
+    Reparse( unsaved_files );
+  }
+
+  unique_lock< mutex > lock( clang_access_mutex_ );
+
+  if ( !clang_translation_unit_ ) {
+    return Location();
+  }
+
+  CXCursor cursor = GetCursor( filename, line, column );
+
+  if ( !CursorIsValid( cursor ) ) {
+    return Location();
+  }
+
+  return GetDefinitionLocationForCursor( cursor );
+}
+
+Location TranslationUnit::GetDefinitionOrDeclarationLocation(
+  const std::string &filename,
+  int line,
+  int column,
+  const std::vector< UnsavedFile > &unsaved_files,
+  bool reparse ) {
+  if ( reparse ) {
+    Reparse( unsaved_files );
+  }
+
+  unique_lock< mutex > lock( clang_access_mutex_ );
+
+  if ( !clang_translation_unit_ ) {
+    return Location();
+  }
+
+  CXCursor cursor = GetCursor( filename, line, column );
+
+  if ( !CursorIsValid( cursor ) ) {
+    return Location();
+  }
+
+  // Return the definition or the declaration of a symbol under the cursor
+  // according to the following logic:
+  //  - if the cursor is already on the definition, return the location of the
+  //    declaration;
+  //  - otherwise, search for the definition and return its location;
+  //  - if no definition is found, return the location of the declaration.
+  if ( clang_isCursorDefinition( cursor ) ) {
+    return GetDeclarationLocationForCursor( cursor );
+  }
+
+  Location location = GetDefinitionLocationForCursor( cursor );
+
+  if ( location.IsValid() ) {
+    return location;
+  }
+
+  return GetDeclarationLocationForCursor( cursor );
+}
+
 std::string TranslationUnit::GetTypeAtLocation(
+  const std::string &filename,
   int line,
   int column,
   const std::vector< UnsavedFile > &unsaved_files,
@@ -269,7 +322,7 @@ std::string TranslationUnit::GetTypeAtLocation(
     return "Internal error: no translation unit";
   }
 
-  CXCursor cursor = GetCursor( line, column );
+  CXCursor cursor = GetCursor( filename, line, column );
 
   if ( !CursorIsValid( cursor ) ) {
     return "Internal error: cursor not valid";
@@ -321,6 +374,7 @@ std::string TranslationUnit::GetTypeAtLocation(
 }
 
 std::string TranslationUnit::GetEnclosingFunctionAtLocation(
+  const std::string &filename,
   int line,
   int column,
   const std::vector< UnsavedFile > &unsaved_files,
@@ -336,7 +390,7 @@ std::string TranslationUnit::GetEnclosingFunctionAtLocation(
     return "Internal error: no translation unit";
   }
 
-  CXCursor cursor = GetCursor( line, column );
+  CXCursor cursor = GetCursor( filename, line, column );
 
   if ( !CursorIsValid( cursor ) ) {
     return "Internal error: cursor not valid";
@@ -442,6 +496,7 @@ private:
 }
 
 std::vector< FixIt > TranslationUnit::GetFixItsForLocationInFile(
+  const std::string &filename,
   int line,
   int column,
   const std::vector< UnsavedFile > &unsaved_files,
@@ -453,16 +508,28 @@ std::vector< FixIt > TranslationUnit::GetFixItsForLocationInFile(
 
   std::vector< FixIt > fixits;
 
+  auto canonical_filename = boost::filesystem::canonical( filename );
+
   {
     unique_lock< mutex > lock( diagnostics_mutex_ );
 
     for ( const Diagnostic& diagnostic : latest_diagnostics_ ) {
-      // Find all diagnostics for the supplied line which have FixIts attached
-      if ( diagnostic.location_.line_number_ == static_cast< size_t >( line ) ) {
-        fixits.insert( fixits.end(),
-                       diagnostic.fixits_.begin(),
-                       diagnostic.fixits_.end() );
+      auto this_filename = boost::filesystem::canonical(
+        diagnostic.location_.filename_ );
+
+      if ( canonical_filename != this_filename ) {
+        continue;
       }
+
+      // Find all diagnostics for the supplied line which have FixIts attached
+      if ( diagnostic.location_.line_number_ !=
+             static_cast< size_t >( line ) ) {
+        continue;
+      }
+
+      fixits.insert( fixits.end(),
+                     diagnostic.fixits_.begin(),
+                     diagnostic.fixits_.end() );
     }
   }
 
@@ -475,6 +542,7 @@ std::vector< FixIt > TranslationUnit::GetFixItsForLocationInFile(
 }
 
 DocumentationData TranslationUnit::GetDocsForLocationInFile(
+  const std::string &filename,
   int line,
   int column,
   const std::vector< UnsavedFile > &unsaved_files,
@@ -490,7 +558,7 @@ DocumentationData TranslationUnit::GetDocsForLocationInFile(
     return DocumentationData();
   }
 
-  CXCursor cursor = GetCursor( line, column );
+  CXCursor cursor = GetCursor( filename, line, column );
 
   if ( !CursorIsValid( cursor ) ) {
     return DocumentationData();
@@ -514,15 +582,16 @@ DocumentationData TranslationUnit::GetDocsForLocationInFile(
   return DocumentationData( canonical_cursor );
 }
 
-
 std::vector< Token > TranslationUnit::GetSemanticTokens(
+  const std::string &filename,
   int start_line,
   int start_column,
   int end_line,
   int end_column ) {
 
   unique_lock< mutex > lock( clang_access_mutex_ );
-  CXSourceRange range = GetSourceRange( start_line, start_column,
+  CXSourceRange range = GetSourceRange( filename,
+                                        start_line, start_column,
                                         end_line, end_column );
 
   if ( clang_Range_isNull( range ) ) {
@@ -551,10 +620,10 @@ std::vector< Token > TranslationUnit::GetSemanticTokens(
   return semantic_tokens;
 }
 
-std::vector< Range > TranslationUnit::GetSkippedRanges() {
+std::vector< Range > TranslationUnit::GetSkippedRanges( const std::string &filename ) {
 
   unique_lock< mutex > lock( clang_access_mutex_ );
-  CXFile file = clang_getFile( clang_translation_unit_, filename_.c_str() );
+  CXFile file = clang_getFile( clang_translation_unit_, filename.c_str() );
   CXSourceRangeList *source_ranges =
     clang_getSkippedRanges( clang_translation_unit_, file );
 
@@ -573,13 +642,15 @@ std::vector< Range > TranslationUnit::GetSkippedRanges() {
   return skipped_ranges;
 }
 
-CXCursor TranslationUnit::GetCursor( int line, int column ) {
+CXCursor TranslationUnit::GetCursor( const std::string &filename,
+                                     int line,
+                                     int column ) {
   // ASSUMES A LOCK IS ALREADY HELD ON clang_access_mutex_!
   if ( !clang_translation_unit_ ) {
     return clang_getNullCursor();
   }
 
-  CXFile file = clang_getFile( clang_translation_unit_, filename_.c_str() );
+  CXFile file = clang_getFile( clang_translation_unit_, filename.c_str() );
   CXSourceLocation source_location = clang_getLocation(
                                        clang_translation_unit_,
                                        file,
@@ -590,6 +661,7 @@ CXCursor TranslationUnit::GetCursor( int line, int column ) {
 }
 
 CXSourceRange TranslationUnit::GetSourceRange(
+  const std::string &filename,
   int start_line, int start_column,
   int end_line, int end_column ) {
 
@@ -598,7 +670,7 @@ CXSourceRange TranslationUnit::GetSourceRange(
     return clang_getNullRange();
   }
 
-  CXFile file = clang_getFile( clang_translation_unit_, filename_.c_str() );
+  CXFile file = clang_getFile( clang_translation_unit_, filename.c_str() );
   CXSourceLocation start = clang_getLocation( clang_translation_unit_, file,
                                               start_line, start_column );
   CXSourceLocation end = clang_getLocation( clang_translation_unit_, file,

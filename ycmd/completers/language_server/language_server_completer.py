@@ -1,4 +1,4 @@
-# Copyright (C) 2017 ycmd contributors
+# Copyright (C) 2017-2018 ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -31,7 +31,7 @@ import queue
 import threading
 
 from ycmd.completers.completer import Completer
-from ycmd.completers.completer_utils import GetFileContents
+from ycmd.completers.completer_utils import GetFileContents, GetFileLines
 from ycmd import utils
 from ycmd import responses
 
@@ -597,6 +597,9 @@ class LanguageServerCompleter( Completer ):
   Completions
 
   - The implementation should not require any code to support completions
+  - (optional) Override GetCodepointForCompletionRequest if you wish to change
+    the completion position (e.g. if you want to pass the "query" to the
+    server)
 
   Diagnostics
 
@@ -733,6 +736,12 @@ class LanguageServerCompleter( Completer ):
                request_data ) )
 
 
+  def GetCodepointForCompletionRequest( self, request_data ):
+    """Returns the 1-based codepoint offset on the current line at which to make
+    the completion request"""
+    return request_data[ 'start_codepoint' ]
+
+
   def ComputeCandidatesInner( self, request_data ):
     if not self.ServerIsReady():
       return None
@@ -740,7 +749,11 @@ class LanguageServerCompleter( Completer ):
     self._UpdateServerWithFileContents( request_data )
 
     request_id = self.GetConnection().NextRequestId()
-    msg = lsp.Completion( request_id, request_data )
+
+    msg = lsp.Completion(
+      request_id,
+      request_data,
+      self.GetCodepointForCompletionRequest( request_data ) )
     response = self.GetConnection().GetResponse( request_id,
                                                  msg,
                                                  REQUEST_TIMEOUT_COMPLETION )
@@ -896,10 +909,12 @@ class LanguageServerCompleter( Completer ):
     # However, we _also_ return them here to refresh diagnostics after, say
     # changing the active file in the editor, or for clients not supporting the
     # polling mechanism.
-    uri = lsp.FilePathToUri( request_data[ 'filepath' ] )
+    filepath = request_data[ 'filepath' ]
+    uri = lsp.FilePathToUri( filepath )
+    contents = GetFileLines( request_data, filepath )
     with self._server_info_mutex:
       if uri in self._latest_diagnostics:
-        return [ _BuildDiagnostic( request_data, uri, diag )
+        return [ _BuildDiagnostic( contents, uri, diag )
                  for diag in self._latest_diagnostics[ uri ] ]
 
 
@@ -1010,7 +1025,30 @@ class LanguageServerCompleter( Completer ):
     if notification[ 'method' ] == 'window/showMessage':
       return responses.BuildDisplayMessageResponse(
         notification[ 'params' ][ 'message' ] )
-    elif notification[ 'method' ] == 'window/logMessage':
+
+    if notification[ 'method' ] == 'textDocument/publishDiagnostics':
+      params = notification[ 'params' ]
+      uri = params[ 'uri' ]
+
+      try:
+        filepath = lsp.UriToFilePath( uri )
+      except lsp.InvalidUriException:
+        _logger.exception( 'Ignoring diagnostics for unrecognized URI' )
+        return None
+
+      with self._server_info_mutex:
+        if filepath in self._server_file_state:
+          contents = utils.SplitLines(
+            self._server_file_state[ filepath ].contents )
+        else:
+          contents = GetFileLines( request_data, filepath )
+      return {
+        'diagnostics': [ _BuildDiagnostic( contents, uri, x )
+                         for x in params[ 'diagnostics' ] ],
+        'filepath': filepath
+      }
+
+    if notification[ 'method' ] == 'window/logMessage':
       log_level = [
         None, # 1-based enum from LSP
         logging.ERROR,
@@ -1022,20 +1060,6 @@ class LanguageServerCompleter( Completer ):
       params = notification[ 'params' ]
       _logger.log( log_level[ int( params[ 'type' ] ) ],
                    SERVER_LOG_PREFIX + params[ 'message' ] )
-    elif notification[ 'method' ] == 'textDocument/publishDiagnostics':
-      params = notification[ 'params' ]
-      uri = params[ 'uri' ]
-      try:
-        filepath = lsp.UriToFilePath( uri )
-        response = {
-          'diagnostics': [ _BuildDiagnostic( request_data, uri, x )
-                           for x in params[ 'diagnostics' ] ],
-          'filepath': filepath
-        }
-        return response
-      except lsp.InvalidUriException:
-        _logger.exception( 'Ignoring diagnostics for unrecognized URI' )
-        pass
 
     return None
 
@@ -1204,14 +1228,25 @@ class LanguageServerCompleter( Completer ):
       self._server_capabilities = response[ 'result' ][ 'capabilities' ]
       self._resolve_completion_items = self._ShouldResolveCompletionItems()
 
-      if 'textDocumentSync' in response[ 'result' ][ 'capabilities' ]:
+      if 'textDocumentSync' in self._server_capabilities:
+        sync = self._server_capabilities[ 'textDocumentSync' ]
         SYNC_TYPE = [
           'None',
           'Full',
           'Incremental'
         ]
-        self._sync_type = SYNC_TYPE[
-          response[ 'result' ][ 'capabilities' ][ 'textDocumentSync' ] ]
+
+        # The sync type can either be a number or an object. Because it's
+        # important to make things difficult.
+        if isinstance( sync, dict ):
+          # FIXME: We should really actually check all of the other things that
+          # could exist in this structure.
+          if 'change' in sync:
+            sync = sync[ 'change' ]
+          else:
+            sync = 1
+
+        self._sync_type = SYNC_TYPE[ sync ]
         _logger.info( 'Language server requires sync type of {0}'.format(
           self._sync_type ) )
 
@@ -1366,7 +1401,7 @@ class LanguageServerCompleter( Completer ):
               'line': line_num_ls,
               'character': lsp.CodepointsToUTF16CodeUnits(
                 line_value,
-                len( line_value ) ) - 1,
+                len( line_value ) + 1 ) - 1,
             }
           },
           [] ),
@@ -1420,9 +1455,11 @@ class LanguageServerCompleter( Completer ):
     response = self.GetConnection().GetResponse( request_id,
                                                  message,
                                                  REQUEST_TIMEOUT_COMMAND )
+    filepath = request_data[ 'filepath' ]
+    contents = GetFileLines( request_data, filepath )
     chunks = [ responses.FixItChunk( text_edit[ 'newText' ],
-                                     _BuildRange( request_data,
-                                                  request_data[ 'filepath' ],
+                                     _BuildRange( contents,
+                                                  filepath,
                                                   text_edit[ 'range' ] ) )
                for text_edit in response[ 'result' ] or [] ]
 
@@ -1431,6 +1468,20 @@ class LanguageServerCompleter( Completer ):
                           request_data[ 'column_num' ],
                           request_data[ 'filepath' ] ),
       chunks ) ] )
+
+
+  def GetCommandResponse( self, request_data, command, arguments ):
+    if not self.ServerIsReady():
+      raise RuntimeError( 'Server is initializing. Please wait.' )
+
+    self._UpdateServerWithFileContents( request_data )
+
+    request_id = self.GetConnection().NextRequestId()
+    message = lsp.ExecuteCommand( request_id, command, arguments )
+    response = self.GetConnection().GetResponse( request_id,
+                                                 message,
+                                                 REQUEST_TIMEOUT_COMMAND )
+    return response[ 'result' ]
 
 
 def _CompletionItemToCompletionData( insertion_text, item, fixits ):
@@ -1544,9 +1595,11 @@ def _InsertionTextForItem( request_data, item ):
   additional_text_edits.extend( item.get( 'additionalTextEdits', [] ) )
 
   if additional_text_edits:
+    filepath = request_data[ 'filepath' ]
+    contents = GetFileLines( request_data, filepath )
     chunks = [ responses.FixItChunk( e[ 'newText' ],
-                                     _BuildRange( request_data,
-                                                  request_data[ 'filepath' ],
+                                     _BuildRange( contents,
+                                                  filepath,
                                                   e[ 'range' ] ) )
                for e in additional_text_edits ]
 
@@ -1645,8 +1698,7 @@ def _GetCompletionItemStartCodepointOrReject( text_edit, request_data ):
       "The TextEdit '{0}' spans multiple lines".format(
         text_edit[ 'newText' ] ) )
 
-  file_contents = utils.SplitLines(
-    GetFileContents( request_data, request_data[ 'filepath' ] ) )
+  file_contents = GetFileLines( request_data, request_data[ 'filepath' ] )
   line_value = file_contents[ edit_range[ 'start' ][ 'line' ] ]
 
   start_codepoint = lsp.UTF16CodeUnitsToCodepoints(
@@ -1687,8 +1739,7 @@ def _PositionToLocationAndDescription( request_data, position ):
   """Convert a LSP position to a ycmd location."""
   try:
     filename = lsp.UriToFilePath( position[ 'uri' ] )
-    file_contents = utils.SplitLines( GetFileContents( request_data,
-                                                       filename ) )
+    file_contents = GetFileLines( request_data, filename )
   except lsp.InvalidUriException:
     _logger.debug( "Invalid URI, file contents not available in GoTo" )
     filename = ''
@@ -1701,13 +1752,12 @@ def _PositionToLocationAndDescription( request_data, position ):
                        "GoTo location" )
     file_contents = []
 
-  return _BuildLocationAndDescription( request_data,
-                                       filename,
+  return _BuildLocationAndDescription( filename,
                                        file_contents,
                                        position[ 'range' ][ 'start' ] )
 
 
-def _BuildLocationAndDescription( request_data, filename, file_contents, loc ):
+def _BuildLocationAndDescription( filename, file_contents, loc ):
   """Returns a tuple of (
     - ycmd Location for the supplied filename and LSP location
     - contents of the line at that location
@@ -1731,29 +1781,17 @@ def _BuildLocationAndDescription( request_data, filename, file_contents, loc ):
            line_value )
 
 
-def _BuildRange( request_data, filename, r ):
+def _BuildRange( contents, filename, r ):
   """Returns a ycmd range from a LSP range |r|."""
-  try:
-    file_contents = utils.SplitLines( GetFileContents( request_data,
-                                                       filename ) )
-  except IOError:
-    # It's possible to receive positions for files which no longer exist (due to
-    # race condition).
-    _logger.exception( "A file could not be found when determining a "
-                       "range location" )
-    file_contents = []
-
-  return responses.Range( _BuildLocationAndDescription( request_data,
-                                                        filename,
-                                                        file_contents,
+  return responses.Range( _BuildLocationAndDescription( filename,
+                                                        contents,
                                                         r[ 'start' ] )[ 0 ],
-                          _BuildLocationAndDescription( request_data,
-                                                        filename,
-                                                        file_contents,
+                          _BuildLocationAndDescription( filename,
+                                                        contents,
                                                         r[ 'end' ] )[ 0 ] )
 
 
-def _BuildDiagnostic( request_data, uri, diag ):
+def _BuildDiagnostic( contents, uri, diag ):
   """Return a ycmd diagnostic from a LSP diagnostic."""
   try:
     filename = lsp.UriToFilePath( uri )
@@ -1761,7 +1799,7 @@ def _BuildDiagnostic( request_data, uri, diag ):
     _logger.debug( 'Invalid URI received for diagnostic' )
     filename = ''
 
-  r = _BuildRange( request_data, filename, diag[ 'range' ] )
+  r = _BuildRange( contents, filename, diag[ 'range' ] )
 
   return responses.BuildDiagnosticData( responses.Diagnostic(
     ranges = [ r ],
@@ -1779,9 +1817,10 @@ def TextEditToChunks( request_data, uri, text_edit ):
     _logger.debug( 'Invalid filepath received in TextEdit' )
     filepath = ''
 
+  contents = GetFileLines( request_data, filepath )
   return [
     responses.FixItChunk( change[ 'newText' ],
-                          _BuildRange( request_data,
+                          _BuildRange( contents,
                                        filepath,
                                        change[ 'range' ] ) )
     for change in text_edit

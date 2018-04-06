@@ -48,11 +48,12 @@ public:
   bool UpdatingTranslationUnit( const std::string &filename );
 
   YCM_EXPORT std::vector< Diagnostic > UpdateTranslationUnit(
-    const std::string &filename,
+    const std::string &translation_unit,
     const std::vector< UnsavedFile > &unsaved_files,
     const std::vector< std::string > &flags );
 
   YCM_EXPORT std::vector< CompletionData > CandidatesForLocationInFile(
+    const std::string &translation_unit,
     const std::string &filename,
     int line,
     int column,
@@ -60,6 +61,7 @@ public:
     const std::vector< std::string > &flags );
 
   YCM_EXPORT Location GetDeclarationLocation(
+    const std::string &translation_unit,
     const std::string &filename,
     int line,
     int column,
@@ -68,6 +70,16 @@ public:
     bool reparse = true );
 
   YCM_EXPORT Location GetDefinitionLocation(
+    const std::string &translation_unit,
+    const std::string &filename,
+    int line,
+    int column,
+    const std::vector< UnsavedFile > &unsaved_files,
+    const std::vector< std::string > &flags,
+    bool reparse = true );
+
+  YCM_EXPORT Location GetDefinitionOrDeclarationLocation(
+    const std::string &translation_unit,
     const std::string &filename,
     int line,
     int column,
@@ -76,6 +88,7 @@ public:
     bool reparse = true );
 
   YCM_EXPORT std::string GetTypeAtLocation(
+    const std::string &translation_unit,
     const std::string &filename,
     int line,
     int column,
@@ -84,6 +97,7 @@ public:
     bool reparse = true );
 
   YCM_EXPORT std::string GetEnclosingFunctionAtLocation(
+    const std::string &translation_unit,
     const std::string &filename,
     int line,
     int column,
@@ -92,6 +106,7 @@ public:
     bool reparse = true );
 
   YCM_EXPORT std::vector< FixIt > GetFixItsForLocationInFile(
+    const std::string &translation_unit,
     const std::string &filename,
     int line,
     int column,
@@ -100,6 +115,7 @@ public:
     bool reparse = true );
 
   YCM_EXPORT DocumentationData GetDocsForLocationInFile(
+    const std::string &translation_unit,
     const std::string &filename,
     int line,
     int column,
@@ -108,13 +124,16 @@ public:
     bool reparse = true );
 
   std::vector< Token > GetSemanticTokens(
+    const std::string &translation_unit,
     const std::string &filename,
     int start_line,
     int start_column,
     int end_line,
     int end_column );
 
-  std::vector< Range > GetSkippedRanges( const std::string &filename );
+  std::vector< Range > GetSkippedRanges(
+    const std::string &translation_unit,
+    const std::string &filename );
 
   void DeleteCachesForFile( const std::string &filename );
 
