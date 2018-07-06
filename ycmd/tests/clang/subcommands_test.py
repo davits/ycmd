@@ -25,7 +25,7 @@ from __future__ import division
 from builtins import *  # noqa
 
 from hamcrest import ( assert_that, calling, contains, contains_string,
-                       empty, equal_to, has_entries, raises )
+                       empty, equal_to, has_entry, has_entries, raises )
 from nose.tools import eq_
 from pprint import pprint
 from webtest import AppError
@@ -46,7 +46,6 @@ from ycmd.utils import ReadFile
 def Subcommands_DefinedSubcommands_test( app ):
   subcommands_data = BuildRequest( completer_target = 'cpp' )
   eq_( sorted( [ 'ClearCompilationFlagCache',
-                 'ClearIncludeCache',
                  'FixIt',
                  'GetDoc',
                  'GetDocImprecise',
@@ -68,8 +67,8 @@ def Subcommands_GoTo_ZeroBasedLineAndColumn_test( app ):
     'GoTo_Clang_ZeroBasedLineAndColumn_test.cc' ) )
 
   goto_data = BuildRequest( completer_target = 'filetype_default',
-                            command_arguments = ['GoToDefinition'],
-                            compilation_flags = ['-x', 'c++'],
+                            command_arguments = [ 'GoToDefinition' ],
+                            compilation_flags = [ '-x', 'c++' ],
                             line_num = 10,
                             column_num = 3,
                             contents = contents,
@@ -83,14 +82,35 @@ def Subcommands_GoTo_ZeroBasedLineAndColumn_test( app ):
 
 
 @SharedYcmd
+def Subcommands_GoTo_CUDA_test( app ):
+  filepath = PathToTestFile( 'cuda', 'basic.cu' )
+  contents = ReadFile( filepath )
+
+  goto_data = BuildRequest( completer_target = 'filetype_default',
+                            command_arguments = [ 'GoToDefinition' ],
+                            compilation_flags = [ '-x', 'cuda' ],
+                            line_num = 8,
+                            column_num = 3,
+                            filepath = filepath,
+                            contents = contents,
+                            filetype = 'cuda' )
+
+  eq_( {
+    'filepath': filepath,
+    'line_num': 4,
+    'column_num': 17
+  }, app.post_json( '/run_completer_command', goto_data ).json )
+
+
+@SharedYcmd
 def RunGoToTest_all( app, filename, command, test ):
   contents = ReadFile( PathToTestFile( filename ) )
   common_request = {
     'completer_target' : 'filetype_default',
     'filepath'         : PathToTestFile( filename ),
     'command_arguments': command,
-    'compilation_flags': ['-x',
-                          'c++'],
+    'compilation_flags': [ '-x',
+                           'c++' ],
     'line_num'         : 10,
     'column_num'       : 3,
     'contents'         : contents,
@@ -109,12 +129,12 @@ def RunGoToTest_all( app, filename, command, test ):
   request.update( {
       'line_num'  : test[ 'request' ][ 0 ],
       'column_num': test[ 'request' ][ 1 ],
-  })
+  } )
   response = common_response
-  response.update({
+  response.update( {
       'line_num'  : test[ 'response' ][ 0 ],
       'column_num': test[ 'response' ][ 1 ],
-  })
+  } )
   if len( test[ 'response' ] ) > 2:
     response.update( {
       'filepath': PathToTestFile( test[ 'response' ][ 2 ] )
@@ -131,11 +151,11 @@ def Subcommands_GoTo_all_test():
   # GoToDeclaration
   tests = [
     # Local::x -> definition/declaration of x
-    { 'request': [ 23, 21 ], 'response': [  4,  9 ] },
+    { 'request': [ 23, 21 ], 'response': [ 4,   9 ] },
     # Local::in_line -> definition/declaration of Local::in_line
-    { 'request': [ 24, 26 ], 'response': [  6, 10 ] },
+    { 'request': [ 24, 26 ], 'response': [ 6,  10 ] },
     # Local -> definition/declaration of Local
-    { 'request': [ 24, 16 ], 'response': [  2, 11 ] },
+    { 'request': [ 24, 16 ], 'response': [ 2,  11 ] },
     # Local::out_of_line -> declaration of Local::out_of_line
     { 'request': [ 25, 27 ], 'response': [ 11, 10 ] },
     # GoToDeclaration on definition of out_of_line moves to declaration
@@ -158,17 +178,17 @@ def Subcommands_GoTo_all_test():
   # GoToDefinition
   tests = [
     # Local::x -> declaration/definition of x
-    { 'request': [ 23, 21 ], 'response': [  4,  9 ] },
+    { 'request': [ 23, 21 ], 'response': [ 4,   9 ] },
     # Local::in_line -> declaration/definition of Local::in_line
-    { 'request': [ 24, 26 ], 'response': [  6, 10 ] },
+    { 'request': [ 24, 26 ], 'response': [ 6,  10 ] },
     # Local -> declaration/definition of Local
-    { 'request': [ 24, 16 ], 'response': [  2, 11 ] },
+    { 'request': [ 24, 16 ], 'response': [ 2,  11 ] },
     # Local::out_of_line -> definition of Local::out_of_line
     { 'request': [ 25, 27 ], 'response': [ 14, 13 ] },
     # GoToDefinition on definition of out_of_line moves to itself
     { 'request': [ 14, 13 ], 'response': [ 14, 13 ] },
     # main -> definition of main (not declaration)
-    { 'request': [ 21,  7 ], 'response': [ 21,  5 ]  },
+    { 'request': [ 21,  7 ], 'response': [ 21,  5 ] },
     # Unicøde
     { 'request': [ 34,  8 ], 'response': [ 32, 26 ] },
   ]
@@ -182,11 +202,11 @@ def Subcommands_GoTo_all_test():
   # GoTo
   tests = [
     # Local::x -> declaration/definition of x
-    { 'request': [ 23, 21 ], 'response': [  4,  9 ] },
+    { 'request': [ 23, 21 ], 'response': [ 4,   9 ] },
     # Local::in_line -> declaration/definition of Local::in_line
-    { 'request': [ 24, 26 ], 'response': [  6, 10 ] },
+    { 'request': [ 24, 26 ], 'response': [ 6,  10 ] },
     # Local -> declaration/definition of Local
-    { 'request': [ 24, 16 ], 'response': [  2, 11 ] },
+    { 'request': [ 24, 16 ], 'response': [ 2,  11 ] },
     # Local::out_of_line -> definition of Local::out_of_line
     { 'request': [ 25, 27 ], 'response': [ 14, 13 ] },
     # GoTo on definition of out_of_line moves to declaration
@@ -211,11 +231,11 @@ def Subcommands_GoTo_all_test():
   # GoToImprecise - identical to GoTo
   tests = [
     # Local::x -> declaration/definition of x
-    { 'request': [ 23, 21 ], 'response': [  4,  9 ] },
+    { 'request': [ 23, 21 ], 'response': [ 4,   9 ] },
     # Local::in_line -> declaration/definition of Local::in_line
-    { 'request': [ 24, 26 ], 'response': [  6, 10 ] },
+    { 'request': [ 24, 26 ], 'response': [ 6,  10 ] },
     # Local -> declaration/definition of Local
-    { 'request': [ 24, 16 ], 'response': [  2, 11 ] },
+    { 'request': [ 24, 16 ], 'response': [ 2,  11 ] },
     # Local::out_of_line -> definition of Local::out_of_line
     { 'request': [ 25, 27 ], 'response': [ 14, 13 ] },
     # GoToImprecise on definition of out_of_line moves to declaration
@@ -382,8 +402,9 @@ def Subcommands_GoTo_Unity_test():
 
 
 @SharedYcmd
-def RunGetSemanticTest( app, filename, test, command):
-  contents = ReadFile( PathToTestFile( filename ) )
+def RunGetSemanticTest( app, filepath, filetype, test, command ):
+  contents = ReadFile( filepath )
+  language = { 'cpp': 'c++', 'cuda': 'cuda' }
 
   # We use the -fno-delayed-template-parsing flag to not delay
   # parsing of templates on Windows.  This is the default on
@@ -393,15 +414,15 @@ def RunGetSemanticTest( app, filename, test, command):
     'completer_target' : 'filetype_default',
     'command_arguments': command,
     'compilation_flags': [ '-x',
-                           'c++',
+                           language[ filetype ],
                            # C++11 flag is needed for lambda functions
                            '-std=c++11',
                            '-fno-delayed-template-parsing' ],
     'line_num'         : 10,
     'column_num'       : 3,
-    'filepath'         : PathToTestFile( filename ),
+    'filepath'         : filepath,
     'contents'         : contents,
-    'filetype'         : 'cpp'
+    'filetype'         : filetype
   }
 
   args = test[ 0 ]
@@ -426,80 +447,82 @@ def RunGetSemanticTest( app, filename, test, command):
 def Subcommands_GetType_test():
   tests = [
     # Basic pod types
-    [{'line_num': 20, 'column_num':  3}, 'Foo'],
-    [{'line_num':  1, 'column_num':  1}, 'Internal error: cursor not valid'],
-    [{'line_num': 12, 'column_num':  2}, 'Foo'],
-    [{'line_num': 12, 'column_num':  8}, 'Foo'],
-    [{'line_num': 12, 'column_num':  9}, 'Foo'],
-    [{'line_num': 12, 'column_num': 10}, 'Foo'],
-    [{'line_num': 13, 'column_num':  3}, 'int'],
-    [{'line_num': 13, 'column_num':  7}, 'int'],
-    [{'line_num': 15, 'column_num':  7}, 'char'],
+    [ { 'line_num': 20, 'column_num':  3 }, 'Foo' ],
+    [ { 'line_num':  1, 'column_num':  1 }, 'Internal error: '
+                                            'cursor not valid' ],
+    [ { 'line_num': 12, 'column_num':  2 }, 'Foo' ],
+    [ { 'line_num': 12, 'column_num':  8 }, 'Foo' ],
+    [ { 'line_num': 12, 'column_num':  9 }, 'Foo' ],
+    [ { 'line_num': 12, 'column_num': 10 }, 'Foo' ],
+    [ { 'line_num': 13, 'column_num':  3 }, 'int' ],
+    [ { 'line_num': 13, 'column_num':  7 }, 'int' ],
+    [ { 'line_num': 15, 'column_num':  7 }, 'char' ],
 
     # Function
-    [{'line_num': 18, 'column_num':  2}, 'int ()'],
-    [{'line_num': 18, 'column_num':  6}, 'int ()'],
+    [ { 'line_num': 18, 'column_num':  2 }, 'int ()' ],
+    [ { 'line_num': 18, 'column_num':  6 }, 'int ()' ],
 
     # Declared and canonical type
     # On Ns:: (Unknown)
-    [{'line_num': 21, 'column_num':  3}, 'Unknown type'], # sic
+    [ { 'line_num': 21, 'column_num':  3 }, 'Unknown type' ], # sic
     # On Type (Type)
-    [{'line_num': 21, 'column_num':  8}, 'Ns::Type => Ns::BasicType<char>'],
+    [ { 'line_num': 21, 'column_num':  8 }, 'Ns::Type => Ns::BasicType<char>' ],
     # On "a" (Ns::Type)
-    [{'line_num': 21, 'column_num': 15}, 'Ns::Type => Ns::BasicType<char>'],
-    [{'line_num': 22, 'column_num': 13}, 'Ns::Type => Ns::BasicType<char>'],
+    [ { 'line_num': 21, 'column_num': 15 }, 'Ns::Type => Ns::BasicType<char>' ],
+    [ { 'line_num': 22, 'column_num': 13 }, 'Ns::Type => Ns::BasicType<char>' ],
 
     # Cursor on decl for refs & pointers
-    [{'line_num': 35, 'column_num':  3}, 'Foo'],
-    [{'line_num': 35, 'column_num': 11}, 'Foo &'],
-    [{'line_num': 35, 'column_num': 15}, 'Foo'],
-    [{'line_num': 36, 'column_num':  3}, 'Foo'],
-    [{'line_num': 36, 'column_num': 11}, 'Foo *'],
-    [{'line_num': 36, 'column_num': 18}, 'Foo'],
-    [{'line_num': 38, 'column_num':  3}, 'const Foo &'],
-    [{'line_num': 38, 'column_num': 16}, 'const Foo &'],
-    [{'line_num': 39, 'column_num':  3}, 'const Foo *'],
-    [{'line_num': 39, 'column_num': 16}, 'const Foo *'],
+    [ { 'line_num': 35, 'column_num':  3 }, 'Foo' ],
+    [ { 'line_num': 35, 'column_num': 11 }, 'Foo &' ],
+    [ { 'line_num': 35, 'column_num': 15 }, 'Foo' ],
+    [ { 'line_num': 36, 'column_num':  3 }, 'Foo' ],
+    [ { 'line_num': 36, 'column_num': 11 }, 'Foo *' ],
+    [ { 'line_num': 36, 'column_num': 18 }, 'Foo' ],
+    [ { 'line_num': 38, 'column_num':  3 }, 'const Foo &' ],
+    [ { 'line_num': 38, 'column_num': 16 }, 'const Foo &' ],
+    [ { 'line_num': 39, 'column_num':  3 }, 'const Foo *' ],
+    [ { 'line_num': 39, 'column_num': 16 }, 'const Foo *' ],
 
     # Cursor on usage
-    [{'line_num': 41, 'column_num': 13}, 'const Foo'],
-    [{'line_num': 41, 'column_num': 19}, 'const int'],
-    [{'line_num': 42, 'column_num': 13}, 'const Foo *'],
-    [{'line_num': 42, 'column_num': 20}, 'const int'],
-    [{'line_num': 43, 'column_num': 12}, 'Foo'],
-    [{'line_num': 43, 'column_num': 17}, 'int'],
-    [{'line_num': 44, 'column_num': 12}, 'Foo *'],
-    [{'line_num': 44, 'column_num': 18}, 'int'],
+    [ { 'line_num': 41, 'column_num': 13 }, 'const Foo' ],
+    [ { 'line_num': 41, 'column_num': 19 }, 'const int' ],
+    [ { 'line_num': 42, 'column_num': 13 }, 'const Foo *' ],
+    [ { 'line_num': 42, 'column_num': 20 }, 'const int' ],
+    [ { 'line_num': 43, 'column_num': 12 }, 'Foo' ],
+    [ { 'line_num': 43, 'column_num': 17 }, 'int' ],
+    [ { 'line_num': 44, 'column_num': 12 }, 'Foo *' ],
+    [ { 'line_num': 44, 'column_num': 18 }, 'int' ],
 
     # Auto in declaration
-    [{'line_num': 24, 'column_num':  3}, 'Foo &'],
-    [{'line_num': 24, 'column_num': 11}, 'Foo &'],
-    [{'line_num': 24, 'column_num': 18}, 'Foo'],
-    [{'line_num': 25, 'column_num':  3}, 'Foo *'],
-    [{'line_num': 25, 'column_num': 11}, 'Foo *'],
-    [{'line_num': 25, 'column_num': 18}, 'Foo'],
-    [{'line_num': 27, 'column_num':  3}, 'const Foo &'],
-    [{'line_num': 27, 'column_num': 16}, 'const Foo &'],
-    [{'line_num': 28, 'column_num':  3}, 'const Foo *'],
-    [{'line_num': 28, 'column_num': 16}, 'const Foo *'],
+    [ { 'line_num': 24, 'column_num':  3 }, 'Foo &' ],
+    [ { 'line_num': 24, 'column_num': 11 }, 'Foo &' ],
+    [ { 'line_num': 24, 'column_num': 18 }, 'Foo' ],
+    [ { 'line_num': 25, 'column_num':  3 }, 'Foo *' ],
+    [ { 'line_num': 25, 'column_num': 11 }, 'Foo *' ],
+    [ { 'line_num': 25, 'column_num': 18 }, 'Foo' ],
+    [ { 'line_num': 27, 'column_num':  3 }, 'const Foo &' ],
+    [ { 'line_num': 27, 'column_num': 16 }, 'const Foo &' ],
+    [ { 'line_num': 28, 'column_num':  3 }, 'const Foo *' ],
+    [ { 'line_num': 28, 'column_num': 16 }, 'const Foo *' ],
 
     # Auto in usage
-    [{'line_num': 30, 'column_num': 14}, 'const Foo'],
-    [{'line_num': 30, 'column_num': 21}, 'const int'],
-    [{'line_num': 31, 'column_num': 14}, 'const Foo *'],
-    [{'line_num': 31, 'column_num': 22}, 'const int'],
-    [{'line_num': 32, 'column_num': 13}, 'Foo'],
-    [{'line_num': 32, 'column_num': 19}, 'int'],
-    [{'line_num': 33, 'column_num': 13}, 'Foo *'],
-    [{'line_num': 33, 'column_num': 20}, 'int'],
+    [ { 'line_num': 30, 'column_num': 14 }, 'const Foo' ],
+    [ { 'line_num': 30, 'column_num': 21 }, 'const int' ],
+    [ { 'line_num': 31, 'column_num': 14 }, 'const Foo *' ],
+    [ { 'line_num': 31, 'column_num': 22 }, 'const int' ],
+    [ { 'line_num': 32, 'column_num': 13 }, 'Foo' ],
+    [ { 'line_num': 32, 'column_num': 19 }, 'int' ],
+    [ { 'line_num': 33, 'column_num': 13 }, 'Foo *' ],
+    [ { 'line_num': 33, 'column_num': 20 }, 'int' ],
 
     # Unicode
-    [{'line_num': 47, 'column_num': 13}, 'Unicøde *'],
+    [ { 'line_num': 47, 'column_num': 13 }, 'Unicøde *' ],
   ]
 
   for test in tests:
     yield ( RunGetSemanticTest,
-            'GetType_Clang_test.cc',
+            PathToTestFile( 'GetType_Clang_test.cc' ),
+            'cpp',
             test,
             [ 'GetType' ] )
 
@@ -507,9 +530,19 @@ def Subcommands_GetType_test():
   # just skips the reparse)
   for test in tests:
     yield ( RunGetSemanticTest,
-            'GetType_Clang_test.cc',
+            PathToTestFile( 'GetType_Clang_test.cc' ),
+            'cpp',
             test,
             [ 'GetTypeImprecise' ] )
+
+
+def SubCommands_GetType_CUDA_test():
+  test = [ { 'line_num': 8, 'column_num': 3, }, 'void ()' ]
+  yield ( RunGetSemanticTest,
+          PathToTestFile( 'cuda', 'basic.cu' ),
+          'cuda',
+          test,
+          [ 'GetType' ] )
 
 
 def SubCommands_GetType_Unity_test():
@@ -521,49 +554,55 @@ def SubCommands_GetType_Unity_test():
     },
     'int'
   ]
-  yield RunGetSemanticTest, 'unitya.cc', test, [ 'GetType' ]
+  yield ( RunGetSemanticTest,
+          PathToTestFile( 'unitya.cc' ),
+          'cpp',
+          test,
+          [ 'GetType' ] )
 
 
 def Subcommands_GetParent_test():
   tests = [
-    [{'line_num':  1,  'column_num':  1}, 'Internal error: cursor not valid'],
-    [{'line_num':  2,  'column_num':  8},
-     PathToTestFile( 'GetParent_Clang_test.cc' ) ],
+    [ { 'line_num':  1,  'column_num':  1 }, 'Internal error: '
+                                            'cursor not valid' ],
+    [ { 'line_num':  2,  'column_num':  8 },
+      PathToTestFile( 'GetParent_Clang_test.cc' ) ],
 
     # The reported scope does not include parents
-    [{'line_num':  3,  'column_num': 11}, 'A'],
-    [{'line_num':  4,  'column_num': 13}, 'B'],
-    [{'line_num':  5,  'column_num': 13}, 'B'],
-    [{'line_num':  9,  'column_num': 17}, 'do_z_inline()'],
-    [{'line_num': 15,  'column_num': 22}, 'do_anything(T &)'],
-    [{'line_num': 19,  'column_num':  9}, 'A'],
-    [{'line_num': 20,  'column_num':  9}, 'A'],
-    [{'line_num': 22,  'column_num': 12}, 'A'],
-    [{'line_num': 23,  'column_num':  5}, 'do_Z_inline()'],
-    [{'line_num': 24,  'column_num': 12}, 'do_Z_inline()'],
-    [{'line_num': 28,  'column_num': 14}, 'A'],
+    [ { 'line_num':  3,  'column_num': 11 }, 'A' ],
+    [ { 'line_num':  4,  'column_num': 13 }, 'B' ],
+    [ { 'line_num':  5,  'column_num': 13 }, 'B' ],
+    [ { 'line_num':  9,  'column_num': 17 }, 'do_z_inline()' ],
+    [ { 'line_num': 15,  'column_num': 22 }, 'do_anything(T &)' ],
+    [ { 'line_num': 19,  'column_num':  9 }, 'A' ],
+    [ { 'line_num': 20,  'column_num':  9 }, 'A' ],
+    [ { 'line_num': 22,  'column_num': 12 }, 'A' ],
+    [ { 'line_num': 23,  'column_num':  5 }, 'do_Z_inline()' ],
+    [ { 'line_num': 24,  'column_num': 12 }, 'do_Z_inline()' ],
+    [ { 'line_num': 28,  'column_num': 14 }, 'A' ],
 
-    [{'line_num': 34,  'column_num':  1}, 'do_anything(T &)'],
-    [{'line_num': 39,  'column_num':  1}, 'do_x()'],
-    [{'line_num': 44,  'column_num':  1}, 'do_y()'],
-    [{'line_num': 49,  'column_num':  1}, 'main()'],
+    [ { 'line_num': 34,  'column_num':  1 }, 'do_anything(T &)' ],
+    [ { 'line_num': 39,  'column_num':  1 }, 'do_x()' ],
+    [ { 'line_num': 44,  'column_num':  1 }, 'do_y()' ],
+    [ { 'line_num': 49,  'column_num':  1 }, 'main()' ],
 
     # Lambdas report the name of the variable
-    [{'line_num': 49,  'column_num': 14}, 'l'],
-    [{'line_num': 50,  'column_num': 19}, 'l'],
-    [{'line_num': 51,  'column_num': 16}, 'main()'],
+    [ { 'line_num': 49,  'column_num': 14 }, 'l' ],
+    [ { 'line_num': 50,  'column_num': 19 }, 'l' ],
+    [ { 'line_num': 51,  'column_num': 16 }, 'main()' ],
   ]
 
   for test in tests:
     yield ( RunGetSemanticTest,
-            'GetParent_Clang_test.cc',
+            PathToTestFile( 'GetParent_Clang_test.cc' ),
+            'cpp',
             test,
             [ 'GetParent' ] )
 
 
 @SharedYcmd
-def RunFixItTest( app, line, column, lang, file_name, check ):
-  contents = ReadFile( PathToTestFile( file_name ) )
+def RunFixItTest( app, line, column, lang, file_path, check ):
+  contents = ReadFile( file_path )
 
   language_options = {
     'cpp11': {
@@ -574,6 +613,15 @@ def RunFixItTest( app, line, column, lang, file_name, check ):
                              '-Wextra',
                              '-pedantic' ],
       'filetype'         : 'cpp',
+    },
+    'cuda': {
+      'compilation_flags': [ '-x',
+                             'cuda',
+                             '-std=c++11',
+                             '-Wall',
+                             '-Wextra',
+                             '-pedantic' ],
+      'filetype'         : 'cuda',
     },
     'objective-c': {
       'compilation_flags': [ '-x',
@@ -589,7 +637,7 @@ def RunFixItTest( app, line, column, lang, file_name, check ):
   args = {
     'completer_target' : 'filetype_default',
     'contents'         : contents,
-    'filepath'         : PathToTestFile( file_name ),
+    'filepath'         : file_path,
     'command_arguments': [ 'FixIt' ],
     'line_num'         : line,
     'column_num'       : column,
@@ -612,14 +660,14 @@ def FixIt_Check_cpp11_Ins( results ):
     'fixits': contains( has_entries( {
       'chunks': contains(
         has_entries( {
-          'replacement_text': equal_to('static_cast<int>('),
+          'replacement_text': equal_to( 'static_cast<int>(' ),
           'range': has_entries( {
             'start': has_entries( { 'line_num': 16, 'column_num': 10 } ),
             'end'  : has_entries( { 'line_num': 16, 'column_num': 10 } ),
           } ),
         } ),
         has_entries( {
-          'replacement_text': equal_to(')'),
+          'replacement_text': equal_to( ')' ),
           'range': has_entries( {
             'start': has_entries( { 'line_num': 16, 'column_num': 13 } ),
             'end'  : has_entries( { 'line_num': 16, 'column_num': 13 } ),
@@ -638,14 +686,14 @@ def FixIt_Check_cpp11_InsMultiLine( results ):
     'fixits': contains( has_entries( {
       'chunks': contains(
         has_entries( {
-          'replacement_text': equal_to('static_cast<int>('),
+          'replacement_text': equal_to( 'static_cast<int>(' ),
           'range': has_entries( {
             'start': has_entries( { 'line_num': 26, 'column_num': 7 } ),
             'end'  : has_entries( { 'line_num': 26, 'column_num': 7 } ),
           } ),
         } ),
         has_entries( {
-          'replacement_text': equal_to(')'),
+          'replacement_text': equal_to( ')' ),
           'range': has_entries( {
             'start': has_entries( { 'line_num': 28, 'column_num': 2 } ),
             'end'  : has_entries( { 'line_num': 28, 'column_num': 2 } ),
@@ -663,7 +711,7 @@ def FixIt_Check_cpp11_Del( results ):
     'fixits': contains( has_entries( {
       'chunks': contains(
         has_entries( {
-          'replacement_text': equal_to(''),
+          'replacement_text': equal_to( '' ),
           'range': has_entries( {
             'start': has_entries( { 'line_num': 35, 'column_num': 7 } ),
             'end'  : has_entries( { 'line_num': 35, 'column_num': 9 } ),
@@ -680,7 +728,7 @@ def FixIt_Check_cpp11_Repl( results ):
     'fixits': contains( has_entries( {
       'chunks': contains(
         has_entries( {
-          'replacement_text': equal_to('foo'),
+          'replacement_text': equal_to( 'foo' ),
           'range': has_entries( {
             'start': has_entries( { 'line_num': 40, 'column_num': 6 } ),
             'end'  : has_entries( { 'line_num': 40, 'column_num': 9 } ),
@@ -697,14 +745,14 @@ def FixIt_Check_cpp11_DelAdd( results ):
     'fixits': contains( has_entries( {
       'chunks': contains(
         has_entries( {
-          'replacement_text': equal_to(''),
+          'replacement_text': equal_to( '' ),
           'range': has_entries( {
             'start': has_entries( { 'line_num': 48, 'column_num': 3 } ),
             'end'  : has_entries( { 'line_num': 48, 'column_num': 4 } ),
           } ),
         } ),
         has_entries( {
-          'replacement_text': equal_to('~'),
+          'replacement_text': equal_to( '~' ),
           'range': has_entries( {
             'start': has_entries( { 'line_num': 48, 'column_num': 9 } ),
             'end'  : has_entries( { 'line_num': 48, 'column_num': 9 } ),
@@ -721,7 +769,7 @@ def FixIt_Check_objc( results ):
     'fixits': contains( has_entries( {
       'chunks': contains(
         has_entries( {
-          'replacement_text': equal_to('id'),
+          'replacement_text': equal_to( 'id' ),
           'range': has_entries( {
             'start': has_entries( { 'line_num': 5, 'column_num': 3 } ),
             'end'  : has_entries( { 'line_num': 5, 'column_num': 3 } ),
@@ -745,7 +793,7 @@ def FixIt_Check_cpp11_MultiFirst( results ):
       has_entries( {
         'chunks': contains(
           has_entries( {
-            'replacement_text': equal_to('foo'),
+            'replacement_text': equal_to( 'foo' ),
             'range': has_entries( {
               'start': has_entries( { 'line_num': 54, 'column_num': 16 } ),
               'end'  : has_entries( { 'line_num': 54, 'column_num': 19 } ),
@@ -758,14 +806,14 @@ def FixIt_Check_cpp11_MultiFirst( results ):
       has_entries( {
         'chunks': contains(
           has_entries( {
-            'replacement_text': equal_to(''),
+            'replacement_text': equal_to( '' ),
             'range': has_entries( {
               'start': has_entries( { 'line_num': 54, 'column_num': 52 } ),
               'end'  : has_entries( { 'line_num': 54, 'column_num': 53 } ),
             } ),
           } ),
           has_entries( {
-            'replacement_text': equal_to('~'),
+            'replacement_text': equal_to( '~' ),
             'range': has_entries( {
               'start': has_entries( { 'line_num': 54, 'column_num': 58 } ),
               'end'  : has_entries( { 'line_num': 54, 'column_num': 58 } ),
@@ -785,14 +833,14 @@ def FixIt_Check_cpp11_MultiSecond( results ):
       has_entries( {
         'chunks': contains(
           has_entries( {
-            'replacement_text': equal_to(''),
+            'replacement_text': equal_to( '' ),
             'range': has_entries( {
               'start': has_entries( { 'line_num': 54, 'column_num': 52 } ),
               'end'  : has_entries( { 'line_num': 54, 'column_num': 53 } ),
             } ),
           } ),
           has_entries( {
-            'replacement_text': equal_to('~'),
+            'replacement_text': equal_to( '~' ),
             'range': has_entries( {
               'start': has_entries( { 'line_num': 54, 'column_num': 58 } ),
               'end'  : has_entries( { 'line_num': 54, 'column_num': 58 } ),
@@ -805,7 +853,7 @@ def FixIt_Check_cpp11_MultiSecond( results ):
       has_entries( {
         'chunks': contains(
           has_entries( {
-            'replacement_text': equal_to('foo'),
+            'replacement_text': equal_to( 'foo' ),
             'range': has_entries( {
               'start': has_entries( { 'line_num': 54, 'column_num': 16 } ),
               'end'  : has_entries( { 'line_num': 54, 'column_num': 19 } ),
@@ -823,7 +871,7 @@ def FixIt_Check_unicode_Ins( results ):
     'fixits': contains( has_entries( {
       'chunks': contains(
         has_entries( {
-          'replacement_text': equal_to(';'),
+          'replacement_text': equal_to( ';' ),
           'range': has_entries( {
             'start': has_entries( { 'line_num': 21, 'column_num': 39 } ),
             'end'  : has_entries( { 'line_num': 21, 'column_num': 39 } ),
@@ -882,10 +930,27 @@ def FixIt_Check_cpp11_SpellCheck( results ):
   } ) )
 
 
+def FixIt_Check_cuda( results ):
+  assert_that( results, has_entries( {
+    'fixits': contains(
+      has_entries( {
+        'text': contains_string(
+           "error: kernel function type 'int ()' must have void " ),
+        'chunks': contains(
+          ChunkMatcher( 'void',
+                        LineColMatcher( 3, 12 ),
+                        LineColMatcher( 3, 15 ) )
+        ),
+        'location': LineColMatcher( 3, 12 ),
+      } ) )
+  } ) )
+
+
 def Subcommands_FixIt_all_test():
-  cfile = 'FixIt_Clang_cpp11.cpp'
-  mfile = 'FixIt_Clang_objc.m'
-  ufile = 'unicode.cc'
+  cfile = PathToTestFile( 'FixIt_Clang_cpp11.cpp' )
+  mfile = PathToTestFile( 'FixIt_Clang_objc.m' )
+  cufile = PathToTestFile( 'cuda', 'fixit_test.cu' )
+  ufile = PathToTestFile( 'unicode.cc' )
 
   tests = [
     # L
@@ -903,6 +968,8 @@ def Subcommands_FixIt_all_test():
 
     [ 5, 3,   'objective-c', mfile, FixIt_Check_objc ],
     [ 7, 1,   'objective-c', mfile, FixIt_Check_objc_NoFixIt ],
+
+    [ 3, 12,  'cuda', cufile, FixIt_Check_cuda ],
 
     # multiple errors on a single line; both with fixits
     [ 54, 15, 'cpp11', cfile, FixIt_Check_cpp11_MultiFirst ],
@@ -927,7 +994,7 @@ def Subcommands_FixIt_all_test():
   ]
 
   for test in tests:
-    yield RunFixItTest, test[0], test[1], test[2], test[3], test[4]
+    yield RunFixItTest, test[ 0 ], test[ 1 ], test[ 2 ], test[ 3 ], test[ 4 ]
 
 
 @SharedYcmd
@@ -1005,8 +1072,7 @@ def Subcommands_GetDoc_Variable_test( app ):
                              line_num = 70,
                              column_num = 24,
                              contents = contents,
-                             command_arguments = [ 'GetDoc' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDoc' ] )
 
   response = app.post_json( '/run_completer_command', event_data ).json
 
@@ -1035,8 +1101,7 @@ def Subcommands_GetDoc_Method_test( app ):
                              line_num = 22,
                              column_num = 13,
                              contents = contents,
-                             command_arguments = [ 'GetDoc' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDoc' ] )
 
   response = app.post_json( '/run_completer_command', event_data ).json
 
@@ -1069,8 +1134,7 @@ def Subcommands_GetDoc_Namespace_test( app ):
                              line_num = 65,
                              column_num = 14,
                              contents = contents,
-                             command_arguments = [ 'GetDoc' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDoc' ] )
 
   response = app.post_json( '/run_completer_command', event_data ).json
 
@@ -1097,8 +1161,7 @@ def Subcommands_GetDoc_Undocumented_test( app ):
                              line_num = 81,
                              column_num = 17,
                              contents = contents,
-                             command_arguments = [ 'GetDoc' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDoc' ] )
 
   response = app.post_json( '/run_completer_command',
                             event_data,
@@ -1121,8 +1184,7 @@ def Subcommands_GetDoc_NoCursor_test( app ):
                              line_num = 1,
                              column_num = 1,
                              contents = contents,
-                             command_arguments = [ 'GetDoc' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDoc' ] )
 
   response = app.post_json( '/run_completer_command',
                             event_data,
@@ -1132,6 +1194,37 @@ def Subcommands_GetDoc_NoCursor_test( app ):
 
   assert_that( response.json,
                ErrorMatcher( ValueError, NO_DOCUMENTATION_MESSAGE ) )
+
+
+@SharedYcmd
+def Subcommands_GetDoc_SystemHeaders_test( app ):
+  app.post_json( '/load_extra_conf_file', {
+    'filepath': PathToTestFile( 'get_doc', '.ycm_extra_conf.py' ) } )
+
+  filepath = PathToTestFile( 'get_doc', 'test.cpp' )
+  contents = ReadFile( filepath )
+
+  event_data = BuildRequest( filepath = filepath,
+                             filetype = 'cpp',
+                             line_num = 4,
+                             column_num = 7,
+                             contents = contents,
+                             command_arguments = [ 'GetDoc' ] )
+
+  response = app.post_json( '/run_completer_command', event_data ).json
+
+  assert_that( response,
+               has_entry( 'detailed_info', """\
+int test()
+This is a function.
+Type: int ()
+Name: test
+---
+
+\\brief This is a function.
+
+This function is defined in a system header.
+""" ) )
 
 
 # Following tests repeat the tests above, but without re-parsing the file
@@ -1153,8 +1246,7 @@ def Subcommands_GetDocImprecise_Variable_test( app ):
                              line_num = 70,
                              column_num = 24,
                              contents = contents,
-                             command_arguments = [ 'GetDocImprecise' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDocImprecise' ] )
 
   response = app.post_json( '/run_completer_command', event_data ).json
 
@@ -1192,8 +1284,7 @@ def Subcommands_GetDocImprecise_Method_test( app ):
                              line_num = 22,
                              column_num = 13,
                              contents = contents,
-                             command_arguments = [ 'GetDocImprecise' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDocImprecise' ] )
 
   response = app.post_json( '/run_completer_command', event_data ).json
 
@@ -1235,8 +1326,7 @@ def Subcommands_GetDocImprecise_Namespace_test( app ):
                              line_num = 65,
                              column_num = 14,
                              contents = contents,
-                             command_arguments = [ 'GetDocImprecise' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDocImprecise' ] )
 
   response = app.post_json( '/run_completer_command', event_data ).json
 
@@ -1272,8 +1362,7 @@ def Subcommands_GetDocImprecise_Undocumented_test( app ):
                              line_num = 81,
                              column_num = 17,
                              contents = contents,
-                             command_arguments = [ 'GetDocImprecise' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDocImprecise' ] )
 
   response = app.post_json( '/run_completer_command',
                             event_data,
@@ -1305,8 +1394,7 @@ def Subcommands_GetDocImprecise_NoCursor_test( app ):
                              line_num = 1,
                              column_num = 1,
                              contents = contents,
-                             command_arguments = [ 'GetDocImprecise' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDocImprecise' ] )
 
   response = app.post_json( '/run_completer_command',
                             event_data,
@@ -1329,8 +1417,7 @@ def Subcommands_GetDocImprecise_NoReadyToParse_test( app ):
                              line_num = 11,
                              column_num = 18,
                              contents = contents,
-                             command_arguments = [ 'GetDocImprecise' ],
-                             completer_target = 'filetype_default' )
+                             command_arguments = [ 'GetDocImprecise' ] )
 
   response = app.post_json( '/run_completer_command', event_data ).json
 
@@ -1343,6 +1430,37 @@ Name: get_a_global_variable
 ---
 This is a method which is only pretend global
 @param test Set this to true. Do it.""" } )
+
+
+@SharedYcmd
+def Subcommands_GetDocImprecise_SystemHeaders_test( app ):
+  app.post_json( '/load_extra_conf_file', {
+    'filepath': PathToTestFile( 'get_doc', '.ycm_extra_conf.py' ) } )
+
+  filepath = PathToTestFile( 'get_doc', 'test.cpp' )
+  contents = ReadFile( filepath )
+
+  event_data = BuildRequest( filepath = filepath,
+                             filetype = 'cpp',
+                             line_num = 4,
+                             column_num = 7,
+                             contents = contents,
+                             command_arguments = [ 'GetDocImprecise' ] )
+
+  response = app.post_json( '/run_completer_command', event_data ).json
+
+  assert_that( response,
+               has_entry( 'detailed_info', """\
+int test()
+This is a function.
+Type: int ()
+Name: test
+---
+
+\\brief This is a function.
+
+This function is defined in a system header.
+""" ) )
 
 
 @SharedYcmd
@@ -1373,3 +1491,31 @@ Name: member_with_å_unicøde
 
 This method has unicøde in it
 """ } )
+
+
+@SharedYcmd
+def Subcommands_GetDoc_CUDA_test( app ):
+  filepath = PathToTestFile( 'cuda', 'basic.cu' )
+  contents = ReadFile( filepath )
+
+  event_data = BuildRequest( filepath = filepath,
+                             filetype = 'cuda',
+                             compilation_flags = [ '-x', 'cuda' ],
+                             line_num = 8,
+                             column_num = 3,
+                             contents = contents,
+                             command_arguments = [ 'GetDoc' ],
+                             completer_target = 'filetype_default' )
+
+  response = app.post_json( '/run_completer_command', event_data ).json
+
+  pprint( response )
+
+  eq_( response, {
+    'detailed_info': """\
+void kernel()
+This is a test kernel
+Type: void ()
+Name: kernel
+---
+This is a test kernel""" } )

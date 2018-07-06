@@ -1,4 +1,6 @@
-# Copyright (C) 2017 ycmd contributors
+# encoding: utf-8
+#
+# Copyright (C) 2017-2018 ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -26,7 +28,7 @@ from builtins import *  # noqa
 from hamcrest import ( assert_that, contains, contains_inanyorder, has_entries,
                        has_entry )
 
-from ycmd.tests.typescript import PathToTestFile, SharedYcmd
+from ycmd.tests.typescript import IsolatedYcmd, PathToTestFile, SharedYcmd
 from ycmd.tests.test_utils import BuildRequest, LocationMatcher, RangeMatcher
 from ycmd.utils import ReadFile
 
@@ -74,6 +76,14 @@ def Diagnostics_FileReadyToParse_test( app ):
         'ranges': contains( RangeMatcher( filepath, ( 37, 1 ), ( 37, 12 ) ) ),
         'fixit_available': False
       } ),
+      has_entries( {
+        'kind': 'ERROR',
+        'text': "Cannot find name 'Bår'.",
+        'location': LocationMatcher( filepath, 39, 1 ),
+        'location_extent': RangeMatcher( filepath, ( 39, 1 ), ( 39, 5 ) ),
+        'ranges': contains( RangeMatcher( filepath, ( 39, 1 ), ( 39, 5 ) ) ),
+        'fixit_available': True
+      } ),
     )
   )
 
@@ -99,5 +109,44 @@ def Diagnostics_DetailedDiagnostics_test( app ):
     app.post_json( '/detailed_diagnostic', diagnostic_data ).json,
     has_entry(
       'message', "Property 'nonExistingMethod' does not exist on type 'Bar'."
+    )
+  )
+
+
+@IsolatedYcmd( { 'max_diagnostics_to_display': 1 } )
+def Diagnostics_MaximumDiagnosticsNumberExceeded_test( app ):
+  filepath = PathToTestFile( 'test.ts' )
+  contents = ReadFile( filepath )
+
+  event_data = BuildRequest( filepath = filepath,
+                             filetype = 'typescript',
+                             contents = contents,
+                             event_name = 'BufferVisit' )
+  app.post_json( '/event_notification', event_data )
+
+  event_data = BuildRequest( filepath = filepath,
+                             filetype = 'typescript',
+                             contents = contents,
+                             event_name = 'FileReadyToParse' )
+
+  assert_that(
+    app.post_json( '/event_notification', event_data ).json,
+    contains_inanyorder(
+      has_entries( {
+        'kind': 'ERROR',
+        'text': "Property 'm' does not exist on type 'Foo'.",
+        'location': LocationMatcher( filepath, 17, 5 ),
+        'location_extent': RangeMatcher( filepath, ( 17, 5 ), ( 17, 6 ) ),
+        'ranges': contains( RangeMatcher( filepath, ( 17, 5 ), ( 17, 6 ) ) ),
+        'fixit_available': True
+      } ),
+      has_entries( {
+        'kind': 'ERROR',
+        'text': 'Maximum number of diagnostics exceeded.',
+        'location': LocationMatcher( filepath, 1, 1 ),
+        'location_extent': RangeMatcher( filepath, ( 1, 1 ), ( 1, 1 ) ),
+        'ranges': contains( RangeMatcher( filepath, ( 1, 1 ), ( 1, 1 ) ) ),
+        'fixit_available': False
+      } ),
     )
   )

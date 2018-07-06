@@ -124,6 +124,16 @@ def CompatibleWithCurrentCore():
 def SetUpPythonPath():
   sys.path.insert( 0, os.path.join( DIR_OF_CURRENT_SCRIPT, '..' ) )
 
+  # We don't add this path in AddNearestThirdPartyFoldersToSysPath because
+  # loading the regex module in YCM may cause a segmentation fault if the module
+  # is compiled for a different version of Python than the one running YCM.
+  regex_folder = os.path.join( DIR_OF_CURRENT_SCRIPT,
+                               '..',
+                               'third_party',
+                               'cregex',
+                               'regex_{}'.format( sys.version_info[ 0 ] ) )
+  sys.path.insert( 0, regex_folder )
+
   AddNearestThirdPartyFoldersToSysPath( __file__ )
 
 
@@ -188,5 +198,10 @@ def AddNearestThirdPartyFoldersToSysPath( filepath ):
                        os.path.realpath( os.path.join( path_to_third_party,
                                                        folder ) ) )
       continue
+
+    # The regex module is already included in SetUpPythonPath.
+    if folder == 'cregex':
+      continue
+
     sys.path.insert( 0, os.path.realpath( os.path.join( path_to_third_party,
                                                         folder ) ) )

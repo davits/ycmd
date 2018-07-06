@@ -39,7 +39,7 @@ from ycmd.responses import ( BuildExceptionResponse, BuildCompletionResponse,
 from ycmd.request_wrap import RequestWrap
 from ycmd.bottle_utils import SetResponseHeader
 from ycmd.completers.completer_utils import FilterAndSortCandidatesWrap
-from ycmd.utils import StartThread
+from ycmd.utils import HashableDict, StartThread
 
 
 # num bytes for the request body buffer; request.json only works if the request
@@ -133,7 +133,7 @@ def FilterAndSortCandidates():
   request_data = request.json
 
   return _JsonResponse( FilterAndSortCandidatesWrap(
-    request_data[ 'candidates'],
+    request_data[ 'candidates' ],
     request_data[ 'sort_property' ],
     request_data[ 'query' ],
     _server_state.user_options[ 'max_num_candidates' ] ) )
@@ -143,6 +143,8 @@ def FilterAndSortCandidates():
 def GetSemanticTokens():
   _logger.debug( 'Received semantic tokens request' )
   request_data = request.json
+  request_data[ 'extra_conf_data' ] = HashableDict(
+    request_data.get( 'extra_conf_data', {} ) )
   completer = _server_state.GetFiletypeCompleter( request_data[ 'filetypes' ] )
 
   return _JsonResponse( completer.GetSemanticTokens( request_data ) )
@@ -152,6 +154,8 @@ def GetSemanticTokens():
 def GetSkippedRanges():
   _logger.debug( 'Received skipped ranges request' )
   request_data = request.json
+  request_data[ 'extra_conf_data' ] = HashableDict(
+    request_data.get( 'extra_conf_data', {} ) )
   completer = _server_state.GetFiletypeCompleter( request_data[ 'filetypes' ] )
 
   return _JsonResponse( completer.GetSkippedRanges( request_data ) )

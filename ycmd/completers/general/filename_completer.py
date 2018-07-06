@@ -25,18 +25,17 @@ from builtins import *  # noqa
 
 import logging
 import os
-import re
 
 from ycmd.completers.completer import Completer
 from ycmd.utils import ( ExpandVariablesInPath, GetCurrentDirectory, OnWindows,
-                         ToUnicode )
+                         re, ToUnicode )
 from ycmd import responses
 
 FILE = 1
 DIR = 2
 # This mapping is also used for the #include completion.
-# We have option N3, because when using Qt with specific include paths
-# configuration both file & dir entries can exist.
+# We have option 3, because some entries could simultaneously be
+# both a file and a directory.
 EXTRA_INFO_MAP = { FILE : '[File]', DIR : '[Dir]', 3 : '[File&Dir]' }
 
 _logger = logging.getLogger( __name__ )
@@ -114,7 +113,7 @@ class FilenameCompleter( Completer ):
         path_dir,
         self.user_options[ 'filepath_completion_use_working_dir' ],
         filepath,
-        working_dir) )
+        working_dir ) )
 
 
 def _GetAbsolutePathForCompletions( path_dir,
@@ -161,11 +160,8 @@ def _GetPathCompletionCandidates( path_dir, use_working_dir,
     relative_paths = []
 
   for rel_path in relative_paths:
-    try:
-      absolute_path = os.path.join( unicode_path, rel_path )
-      entries.append( ( rel_path, GetPathType( absolute_path ) ) )
-    except Exception:
-      pass
+    absolute_path = os.path.join( unicode_path, rel_path )
+    entries.append( ( rel_path, GetPathType( absolute_path ) ) )
 
   return entries
 

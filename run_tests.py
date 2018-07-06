@@ -31,6 +31,8 @@ for folder in os.listdir( DIR_OF_THIRD_PARTY ):
   # sys.path the path is.
   if folder == 'python-future':
     continue
+  if folder == 'cregex':
+    folder = p.join( folder, 'regex_{}'.format( sys.version_info[ 0 ] ) )
   python_path.append( p.abspath( p.join( DIR_OF_THIRD_PARTY, folder ) ) )
 if os.environ.get( 'PYTHONPATH' ) is not None:
   python_path.append( os.environ['PYTHONPATH'] )
@@ -122,7 +124,7 @@ def ParseArguments():
                         COMPLETERS.keys()) )
   parser.add_argument( '--skip-build', action = 'store_true',
                        help = 'Do not build ycmd before testing.' )
-  parser.add_argument( '--msvc', type = int, choices = [ 12, 14, 15 ],
+  parser.add_argument( '--msvc', type = int, choices = [ 14, 15 ],
                        default = 15, help = 'Choose the Microsoft Visual '
                        'Studio version (default: %(default)s).' )
   parser.add_argument( '--coverage', action = 'store_true',

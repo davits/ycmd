@@ -26,10 +26,10 @@ from builtins import *  # noqa
 # We don't want ycm_core inside Vim.
 import logging
 import os
-import re
 from collections import defaultdict
 from future.utils import iteritems
-from ycmd.utils import ToCppStringCompatible, ToUnicode, ReadFile, SplitLines
+from ycmd.utils import ( ToCppStringCompatible, ToUnicode, re, ReadFile,
+                         SplitLines )
 
 _logger = logging.getLogger( __name__ )
 
@@ -42,8 +42,8 @@ class PreparedTriggers( object ):
     final_triggers = _FiletypeDictUnion( PREPARED_DEFAULT_FILETYPE_TRIGGERS,
                                          user_prepared_triggers )
     if filetype_set:
-      final_triggers = dict( ( k, v ) for k, v in iteritems( final_triggers )
-                             if k in filetype_set )
+      final_triggers = { k: v for k, v in iteritems( final_triggers )
+                         if k in filetype_set }
 
     self._filetype_to_prepared_triggers = final_triggers
 
@@ -200,7 +200,7 @@ DEFAULT_FILETYPE_TRIGGERS = {
     r're!\[.*\]\s',             # method composition
   ],
   'ocaml' : [ '.', '#' ],
-  'cpp,objcpp' : [ '->', '.', '::' ],
+  'cpp,cuda,objcpp' : [ '->', '.', '::' ],
   'perl' : [ '->' ],
   'php' : [ '->', '::' ],
   'cs,java,javascript,typescript,d,python,perl6,scala,vb,elixir,go,groovy' : [

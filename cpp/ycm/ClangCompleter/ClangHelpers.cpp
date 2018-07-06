@@ -1,4 +1,4 @@
-// Copyright (C) 2013 Google Inc.
+// Copyright (C) 2013-2018 ycmd contributors
 //
 // This file is part of ycmd.
 //
@@ -17,14 +17,13 @@
 
 #include "ClangHelpers.h"
 #include "ClangUtils.h"
-#include "Utils.h"
-#include "UnsavedFile.h"
 #include "Location.h"
-#include "Range.h"
 #include "PythonSupport.h"
+#include "Range.h"
+#include "UnsavedFile.h"
+#include "Utils.h"
 
 #include <unordered_map>
-#include <iostream>
 #include <utility>
 
 using std::unordered_map;
@@ -96,7 +95,7 @@ void BuildFullDiagnosticDataFromChildren(
 
   // Populate any fixit attached to this diagnostic.
   FixIt fixit = BuildFixIt( diag_text, diagnostic );
-  if ( fixit.chunks.size() > 0 ) {
+  if ( !fixit.chunks.empty() ) {
     fixits.push_back( fixit );
   }
 
@@ -150,8 +149,7 @@ std::vector< Range > GetRanges( const DiagnosticWrap &diagnostic_wrap ) {
   ranges.reserve( num_ranges );
 
   for ( size_t i = 0; i < num_ranges; ++i ) {
-    ranges.push_back(
-      Range( clang_getDiagnosticRange( diagnostic_wrap.get(), i ) ) );
+    ranges.emplace_back( clang_getDiagnosticRange( diagnostic_wrap.get(), i ) );
   }
 
   return ranges;
@@ -252,7 +250,7 @@ std::vector< CompletionData > ToCompletionDataVector(
 }
 
 
-Diagnostic BuildDiagnostic( DiagnosticWrap diagnostic_wrap,
+Diagnostic BuildDiagnostic( const DiagnosticWrap &diagnostic_wrap,
                             CXTranslationUnit translation_unit ) {
   Diagnostic diagnostic;
 

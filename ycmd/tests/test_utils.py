@@ -1,5 +1,4 @@
-# Copyright (C) 2013 Google Inc.
-#               2015 ycmd contributors
+# Copyright (C) 2013-2018 ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -41,13 +40,18 @@ import shutil
 from ycmd import extra_conf_store, handlers, user_options_store
 from ycmd.completers.completer import Completer
 from ycmd.responses import BuildCompletionData
-from ycmd.utils import GetCurrentDirectory, OnMac, OnWindows, ToUnicode
+from ycmd.utils import ( GetCurrentDirectory, OnMac, OnWindows, ToUnicode,
+                         WaitUntilProcessIsTerminated )
 import ycm_core
 
 try:
   from unittest import skipIf
 except ImportError:
   from unittest2 import skipIf
+
+DIR_OF_THIS_SCRIPT = os.path.abspath( os.path.dirname( __file__ ) )
+YCMD_EXTRA_CONF = os.path.normpath(
+    os.path.join( DIR_OF_THIS_SCRIPT, '..', '..', '.ycm_extra_conf.py' ) )
 
 Py2Only = skipIf( not PY2, 'Python 2 only' )
 Py3Only = skipIf( PY2, 'Python 3 only' )
@@ -86,6 +90,12 @@ def BuildRequest( **kwargs ):
       request[ key ] = value
 
   return request
+
+
+def CombineRequest( request, data ):
+  kwargs = request.copy()
+  kwargs.update( data )
+  return BuildRequest( **kwargs )
 
 
 def ErrorMatcher( cls, msg = None ):
@@ -203,11 +213,13 @@ def SetUpApp( custom_options = {} ):
 def IsolatedApp( custom_options = {} ):
   old_server_state = handlers._server_state
   old_extra_conf_store_state = extra_conf_store.Get()
+  old_options = user_options_store.GetAll()
   try:
     yield SetUpApp( custom_options )
   finally:
     handlers._server_state = old_server_state
     extra_conf_store.Set( old_extra_conf_store_state )
+    user_options_store.SetAll( old_options )
 
 
 def StartCompleterServer( app, filetype, filepath = '/foo' ):
@@ -236,6 +248,12 @@ def WaitUntilCompleterServerReady( app, filetype, timeout = 30 ):
       return
 
     time.sleep( 0.1 )
+
+
+def MockProcessTerminationTimingOut( handle, timeout = 5 ):
+  WaitUntilProcessIsTerminated( handle, timeout )
+  raise RuntimeError( 'Waited process to terminate for {0} seconds, '
+                      'aborting.'.format( timeout ) )
 
 
 def ClearCompletionsCache():

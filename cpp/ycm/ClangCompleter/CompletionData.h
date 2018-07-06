@@ -50,7 +50,7 @@ enum class CompletionKind {
 // The user can also enable a "preview" window that will show extra information
 // about a completion at the top of the buffer.
 struct CompletionData {
-  CompletionData() {}
+  CompletionData() = default;
   CompletionData( const CXCompletionResult &completion_result );
 
   // What should actually be inserted into the buffer. For a function like
@@ -85,14 +85,6 @@ struct CompletionData {
 
   std::string DocString() const {
     return doc_string_;
-  }
-
-  bool operator== ( const CompletionData &other ) const {
-    return kind_ == other.kind_ &&
-           return_type_ == other.return_type_ &&
-           original_string_ == other.original_string_ &&
-           everything_except_return_type_ == other.everything_except_return_type_;
-    // detailed_info_ doesn't matter
   }
 
   std::string detailed_info_;

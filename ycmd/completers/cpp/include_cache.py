@@ -1,5 +1,6 @@
 # Copyright (C) 2017 Davit Samvelyan davitsamvelyan@gmail.com
 #                    Synopsys.
+#               2018 ycmd contributors
 #
 # This file is part of ycmd.
 #
@@ -26,27 +27,30 @@ from builtins import *  # noqa
 from future.utils import iteritems
 
 import os
+import threading
 
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from ycmd import responses
 from ycmd.completers.general.filename_completer import ( GetPathType,
                                                          GetPathTypeName )
 
+import logging
+_logger = logging.getLogger( __name__ )
 
-class IncludeEntry( object ):
-  """ Represents single include completion candidate.
-  name is the name/string of the completion candidate,
-  entry_type is an integer indicating whether the candidate is a
-  'File', 'Dir' or both (See EXTRA_INFO_MAP in filename_completer). """
-
-  def __init__( self, name, entry_type ):
-    self.name = name
-    self.entry_type = entry_type
+""" Represents single include completion candidate.
+name is the name/string of the completion candidate,
+entry_type is an integer indicating whether the candidate is a
+'File', 'Dir' or both (See EXTRA_INFO_MAP in filename_completer). """
+IncludeEntry = namedtuple( 'IncludeEntry', [ 'name', 'entry_type' ] )
 
 
 class IncludeList( object ):
-  """ Helper class fo combining include completion candidates from
-  several include paths. """
+  """
+  Helper class for combining include completion candidates from
+  several include paths.
+  self._includes is a dictionary whose keys are
+  IncludeEntry `name`s and values are IncludeEntry `entry_type`s.
+  """
 
   def __init__( self ):
     self._includes = defaultdict( int )
@@ -66,42 +70,49 @@ class IncludeList( object ):
 
 
 class IncludeCache( object ):
+  """
+  Holds a dictionary representing the include path cache.
+  Dictionary keys are the include path directories.
+  Dictionary values are tuples whose first object
+  represents `mtime` of the dictionary key and the other
+  object is an IncludeList.
+  """
 
   def __init__( self ):
     self._cache = {}
+    self._cache_lock = threading.Lock()
 
 
-  def Clear( self ):
-    self._cache = {}
-
-
-  def GetIncludes( self, path, cache ):
-    includes = None
-    if cache:
-      includes = self._GetCached( path )
+  def GetIncludes( self, path ):
+    includes = self._GetCached( path )
 
     if includes is None:
       includes = self._ListIncludes( path )
-      if cache:
-        self._AddToCache( path, includes )
+      self._AddToCache( path, includes )
 
     return includes
 
 
-  def _AddToCache( self, path, includes ):
-    mtime = _GetModificationTime( path )
-    self._cache[ path ] = ( mtime, includes )
+  def _AddToCache( self, path, includes, mtime = None ):
+    if not mtime:
+      mtime = _GetModificationTime( path )
+    # mtime of 0 is "a magic value" to represent inaccessible directory mtime.
+    if mtime:
+      with self._cache_lock:
+        self._cache[ path ] = { 'mtime': mtime, 'includes': includes }
 
 
   def _GetCached( self, path ):
     includes = None
-    cache_entry = self._cache.get( path )
+    with self._cache_lock:
+      cache_entry = self._cache.get( path )
     if cache_entry:
       mtime = _GetModificationTime( path )
-      if mtime > cache_entry[ 0 ]:
-        del self._cache[ path ]
+      if mtime > cache_entry[ 'mtime' ]:
+        includes = self._ListIncludes( path )
+        self._AddToCache( path, includes, mtime )
       else:
-        includes = cache_entry[ 1 ]
+        includes = cache_entry[ 'includes' ]
 
     return includes
 
@@ -109,17 +120,15 @@ class IncludeCache( object ):
   def _ListIncludes( self, path ):
     try:
       names = os.listdir( path )
-    except Exception:
+    except OSError:
+      _logger.exception( 'Can not list entries for include path %s.', path )
       return []
 
     includes = []
     for name in names:
-      inc_path = os.path.join(path, name)
-      try:
-        entry_type = GetPathType( inc_path )
-        includes.append( IncludeEntry( name, entry_type ) )
-      except Exception:
-        pass
+      inc_path = os.path.join( path, name )
+      entry_type = GetPathType( inc_path )
+      includes.append( IncludeEntry( name, entry_type ) )
 
     return includes
 
@@ -127,5 +136,7 @@ class IncludeCache( object ):
 def _GetModificationTime( path ):
   try:
     return os.path.getmtime( path )
-  except Exception:
+  except OSError:
+    _logger.exception( 'Can not get modification time for include path %s.',
+                       path )
     return 0

@@ -25,27 +25,26 @@ from __future__ import division
 from builtins import *  # noqa
 
 from hamcrest import ( assert_that, contains, contains_inanyorder, has_entries,
-                       matches_regexp )
+                       has_entry, matches_regexp )
+from mock import patch
 from nose.tools import eq_
 import requests
 import pprint
 
-from ycmd.tests.typescript import PathToTestFile, SharedYcmd
+from ycmd.tests.typescript import IsolatedYcmd, PathToTestFile, SharedYcmd
 from ycmd.tests.test_utils import ( BuildRequest,
                                     ChunkMatcher,
+                                    CombineRequest,
                                     ErrorMatcher,
                                     LocationMatcher,
-                                    MessageMatcher )
+                                    MessageMatcher,
+                                    MockProcessTerminationTimingOut,
+                                    WaitUntilCompleterServerReady )
 from ycmd.utils import ReadFile
 
 
 def RunTest( app, test ):
   contents = ReadFile( test[ 'request' ][ 'filepath' ] )
-
-  def CombineRequest( request, data ):
-    kw = request
-    request.update( data )
-    return BuildRequest( **kw )
 
   app.post_json(
     '/event_notification',
@@ -706,12 +705,13 @@ def Subcommands_FixIt_test( app ):
             'chunks': contains(
               ChunkMatcher(
                 matches_regexp(
-                  '^    nonExistingMethod\(\): any {\r?\n'
+                  '^\r?\n'
+                  '    nonExistingMethod\(\): any {\r?\n'
                   '        throw new Error\("Method not implemented."\);\r?\n'
-                  '    }\r?\n$',
+                  '    }$',
                 ),
-                LocationMatcher( PathToTestFile( 'test.ts' ), 27, 1 ),
-                LocationMatcher( PathToTestFile( 'test.ts' ), 27, 1 ) )
+                LocationMatcher( PathToTestFile( 'test.ts' ), 25, 12 ),
+                LocationMatcher( PathToTestFile( 'test.ts' ), 25, 12 ) )
             ),
             'location': LocationMatcher( PathToTestFile( 'test.ts' ), 35, 12 )
           } ),
@@ -719,9 +719,10 @@ def Subcommands_FixIt_test( app ):
             'text': "Declare property 'nonExistingMethod'",
             'chunks': contains(
               ChunkMatcher(
-                matches_regexp( '^    nonExistingMethod: any;\r?\n$' ),
-                LocationMatcher( PathToTestFile( 'test.ts' ), 27, 1 ),
-                LocationMatcher( PathToTestFile( 'test.ts' ), 27, 1 ) )
+                matches_regexp( '^\r?\n'
+                                '    nonExistingMethod: any;$' ),
+                LocationMatcher( PathToTestFile( 'test.ts' ), 25, 12 ),
+                LocationMatcher( PathToTestFile( 'test.ts' ), 25, 12 ) )
             ),
             'location': LocationMatcher( PathToTestFile( 'test.ts' ), 35, 12 )
           } ),
@@ -729,9 +730,10 @@ def Subcommands_FixIt_test( app ):
             'text': "Add index signature for property 'nonExistingMethod'",
             'chunks': contains(
               ChunkMatcher(
-                matches_regexp( '^    \[x: string\]: any;\r?\n$' ),
-                LocationMatcher( PathToTestFile( 'test.ts' ), 27, 1 ),
-                LocationMatcher( PathToTestFile( 'test.ts' ), 27, 1 ) )
+                matches_regexp( '^\r?\n'
+                                '    \[x: string\]: any;$' ),
+                LocationMatcher( PathToTestFile( 'test.ts' ), 25, 12 ),
+                LocationMatcher( PathToTestFile( 'test.ts' ), 25, 12 ) )
             ),
             'location': LocationMatcher( PathToTestFile( 'test.ts' ), 35, 12 )
           } )
@@ -922,7 +924,7 @@ def Subcommands_RefactorRename_SimpleUnicode_test( app ):
               LocationMatcher( PathToTestFile( 'unicode.ts' ), 23, 7 ) ),
             ChunkMatcher(
               'ø',
-              LocationMatcher( PathToTestFile( 'unicode.ts' ), 27, 17),
+              LocationMatcher( PathToTestFile( 'unicode.ts' ), 27, 17 ),
               LocationMatcher( PathToTestFile( 'unicode.ts' ), 27, 19 ) ),
           ),
           'location': LocationMatcher( PathToTestFile( 'unicode.ts' ), 14, 3 )
@@ -930,3 +932,27 @@ def Subcommands_RefactorRename_SimpleUnicode_test( app ):
       } )
     }
   } )
+
+
+@IsolatedYcmd()
+@patch( 'ycmd.utils.WaitUntilProcessIsTerminated',
+        MockProcessTerminationTimingOut )
+def Subcommands_StopServer_Timeout_test( app ):
+  WaitUntilCompleterServerReady( app, 'typescript' )
+
+  app.post_json(
+    '/run_completer_command',
+    BuildRequest(
+      filetype = 'typescript',
+      command_arguments = [ 'StopServer' ]
+    )
+  )
+
+  request_data = BuildRequest( filetype = 'typescript' )
+  assert_that( app.post_json( '/debug_info', request_data ).json,
+               has_entry(
+                 'completer',
+                 has_entry( 'servers', contains(
+                   has_entry( 'is_running', False )
+                 ) )
+               ) )

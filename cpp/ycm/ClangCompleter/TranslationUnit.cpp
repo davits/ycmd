@@ -15,15 +15,14 @@
 // You should have received a copy of the GNU General Public License
 // along with ycmd.  If not, see <http://www.gnu.org/licenses/>.
 
-#include "TranslationUnit.h"
-#include "CompletionData.h"
 #include "ClangUtils.h"
 #include "ClangHelpers.h"
+#include "CompletionData.h"
+#include "TranslationUnit.h"
 
-#include <boost/filesystem.hpp>
-
-#include <cstdlib>
 #include <algorithm>
+#include <boost/filesystem.hpp>
+#include <cstdlib>
 #include <memory>
 
 using std::unique_lock;
@@ -90,8 +89,8 @@ TranslationUnit::TranslationUnit(
 
   std::vector< CXUnsavedFile > cxunsaved_files =
     ToCXUnsavedFiles( unsaved_files );
-  const CXUnsavedFile *unsaved = cxunsaved_files.size() > 0
-                                 ? &cxunsaved_files[ 0 ] : nullptr;
+  const CXUnsavedFile *unsaved = cxunsaved_files.empty()
+                                 ? nullptr : &cxunsaved_files[ 0 ];
 
   // Actually parse the translation unit.
   CXErrorCode failure = clang_parseTranslationUnit2FullArgv(
@@ -160,8 +159,8 @@ std::vector< CompletionData > TranslationUnit::CandidatesForLocation(
 
   std::vector< CXUnsavedFile > cxunsaved_files =
     ToCXUnsavedFiles( unsaved_files );
-  const CXUnsavedFile *unsaved = cxunsaved_files.size() > 0
-                                 ? &cxunsaved_files[ 0 ] : nullptr;
+  const CXUnsavedFile *unsaved = cxunsaved_files.empty()
+                                 ? nullptr : &cxunsaved_files[ 0 ];
 
   // codeCompleteAt reparses the TU if the underlying source file has changed on
   // disk since the last time the TU was updated and there are no unsaved files.
@@ -434,8 +433,8 @@ void TranslationUnit::Reparse( std::vector< CXUnsavedFile > &unsaved_files,
       return;
     }
 
-    CXUnsavedFile *unsaved = unsaved_files.size() > 0
-                             ? &unsaved_files[ 0 ] : nullptr;
+    CXUnsavedFile *unsaved = unsaved_files.empty()
+                             ? nullptr : &unsaved_files[ 0 ];
 
     // This function should technically return a CXErrorCode enum but return an
     // int instead.
@@ -476,12 +475,13 @@ void TranslationUnit::UpdateLatestDiagnostics() {
 }
 
 namespace {
+
 /// Sort a FixIt container by its location's distance from a given column
 /// (such as the cursor location).
 ///
 /// PreCondition: All FixIts in the container are on the same line.
 struct sort_by_location {
-  sort_by_location( int column ) : column_( column ) { }
+  explicit sort_by_location( int column ) : column_( column ) { }
 
   bool operator()( const FixIt &a, const FixIt &b ) {
     int a_distance = a.location.column_number_ - column_;
@@ -493,7 +493,8 @@ struct sort_by_location {
 private:
   int column_;
 };
-}
+
+} // unnamed namespace
 
 std::vector< FixIt > TranslationUnit::GetFixItsForLocationInFile(
   const std::string &filename,
@@ -541,10 +542,8 @@ std::vector< FixIt > TranslationUnit::GetFixItsForLocationInFile(
   return fixits;
 }
 
-DocumentationData TranslationUnit::GetDocsForLocationInFile(
-  const std::string &filename,
-  int line,
-  int column,
+DocumentationData TranslationUnit::GetDocsForLocation(
+  const Location &location,
   const std::vector< UnsavedFile > &unsaved_files,
   bool reparse ) {
 
@@ -558,28 +557,38 @@ DocumentationData TranslationUnit::GetDocsForLocationInFile(
     return DocumentationData();
   }
 
-  CXCursor cursor = GetCursor( filename, line, column );
+  CXCursor cursor = GetCursor( location.filename_,
+                               location.line_number_,
+                               location.column_number_ );
 
   if ( !CursorIsValid( cursor ) ) {
     return DocumentationData();
   }
 
-  // If the original cursor is a reference, then we return the documentation
-  // for the type/method/etc. that is referenced
-  CXCursor referenced_cursor = clang_getCursorReferenced( cursor );
+  return DocumentationData( cursor );
+}
 
-  if ( CursorIsValid( referenced_cursor ) ) {
-    cursor = referenced_cursor;
+bool TranslationUnit::LocationIsInSystemHeader( const Location &location ) {
+  unique_lock< mutex > lock( clang_access_mutex_ );
+
+  if ( !clang_translation_unit_ || !location.IsValid() ) {
+    return false;
   }
 
-  // We always want the documentation associated with the canonical declaration
-  CXCursor canonical_cursor = clang_getCanonicalCursor( cursor );
+  return clang_Location_isInSystemHeader(
+    GetSourceLocation( location.filename_,
+                       location.line_number_,
+                       location.column_number_ ) );
+}
 
-  if ( !CursorIsValid( canonical_cursor ) ) {
-    return DocumentationData();
-  }
+CXSourceLocation TranslationUnit::GetSourceLocation(
+  const std::string &filename,
+  int line,
+  int column ) {
 
-  return DocumentationData( canonical_cursor );
+  // ASSUMES A LOCK IS ALREADY HELD ON clang_access_mutex_ AND THE TU IS VALID!
+  CXFile file = clang_getFile( clang_translation_unit_, filename.c_str() );
+  return clang_getLocation( clang_translation_unit_, file, line, column );
 }
 
 std::vector< Token > TranslationUnit::GetSemanticTokens(
@@ -645,19 +654,9 @@ std::vector< Range > TranslationUnit::GetSkippedRanges( const std::string &filen
 CXCursor TranslationUnit::GetCursor( const std::string &filename,
                                      int line,
                                      int column ) {
-  // ASSUMES A LOCK IS ALREADY HELD ON clang_access_mutex_!
-  if ( !clang_translation_unit_ ) {
-    return clang_getNullCursor();
-  }
-
-  CXFile file = clang_getFile( clang_translation_unit_, filename.c_str() );
-  CXSourceLocation source_location = clang_getLocation(
-                                       clang_translation_unit_,
-                                       file,
-                                       line,
-                                       column );
-
-  return clang_getCursor( clang_translation_unit_, source_location );
+  // ASSUMES A LOCK IS ALREADY HELD ON clang_access_mutex_ AND THE TU IS VALID!
+  return clang_getCursor( clang_translation_unit_,
+                          GetSourceLocation( filename, line, column ) );
 }
 
 CXSourceRange TranslationUnit::GetSourceRange(

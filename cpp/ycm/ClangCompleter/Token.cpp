@@ -165,12 +165,6 @@ Token::Token( const CXTokenKind cx_kind, const CXSourceRange &cx_range,
   MapKindAndType( cx_kind, cx_cursor );
 }
 
-bool Token::operator==( const Token &other ) const {
-  return kind == other.kind &&
-         type == other.type &&
-         range == other.range;
-}
-
 void Token::MapKindAndType( const CXTokenKind cx_kind,
                             const CXCursor &cx_cursor ) {
   switch ( cx_kind ) {

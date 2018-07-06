@@ -68,7 +68,7 @@ class SemanticToken( object ):
     ( Identifier, Macro ),
     ( Identifier, Unsupported )"""
 
-  def __init__ ( self, kind, token_type, token_range ):
+  def __init__( self, kind, token_type, token_range ):
     self.kind = kind
     self.type = token_type
     self.range = token_range

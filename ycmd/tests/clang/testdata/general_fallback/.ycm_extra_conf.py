@@ -12,13 +12,19 @@ ftopts = {
     '-x', 'c',
     '-I', '.',
   ],
+  'cuda': [
+    '-Wall',
+    '-Wextra',
+    '-x', 'cuda',
+    '--std=c++11',
+  ],
   'objc': [
     '-x', 'objective-c',
     '-I', '.',
   ],
 }
 
-def FlagsForFile(filename, **kwargs):
+def Settings(**kwargs):
   client_data = kwargs['client_data']
   ft = client_data['&filetype']
 

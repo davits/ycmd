@@ -43,15 +43,15 @@ def setUpModule( app ):
     'filepath': PathToTestFile( 'token_test_data', '.ycm_extra_conf.py' ) } )
 
 
-def _SendReadyToParse( app, extra_flags = None ):
-  request = {
-    'filetype': 'cpp',
-    'filepath': _TEST_FILE,
-    'event_name': 'FileReadyToParse',
-    'contents': ReadFile( _TEST_FILE ),
-    'extra_conf_data': extra_flags,
-  }
-  app.post_json( '/event_notification', BuildRequest( **request ),
+def _SendReadyToParse( app, extra_flags = [] ):
+  flags = [ '-x', 'c++' ]
+  flags.extend( extra_flags )
+  event_data = BuildRequest( compilation_flags = flags,
+                             event_name = 'FileReadyToParse',
+                             contents = ReadFile( _TEST_FILE ),
+                             filepath = _TEST_FILE,
+                             filetype = 'cpp' )
+  app.post_json( '/event_notification', event_data,
                  expect_errors = False )
 
 

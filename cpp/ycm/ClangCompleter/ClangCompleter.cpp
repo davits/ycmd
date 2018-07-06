@@ -1,4 +1,4 @@
-// Copyright (C) 2011-2013  Google Inc.
+// Copyright (C) 2011-2018 ycmd contributors
 //
 // This file is part of ycmd.
 //
@@ -16,17 +16,17 @@
 // along with ycmd.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "ClangCompleter.h"
-#include "Result.h"
 #include "Candidate.h"
-#include "TranslationUnit.h"
 #include "CandidateRepository.h"
-#include "CompletionData.h"
-#include "Utils.h"
 #include "ClangUtils.h"
-#include "ReleaseGil.h"
+#include "CompletionData.h"
+#include "Result.h"
+#include "TranslationUnit.h"
+#include "Utils.h"
 
 #include <clang-c/Index.h>
 #include <memory>
+#include <pybind11/pybind11.h>
 
 
 using std::shared_ptr;
@@ -57,7 +57,7 @@ ClangCompleter::~ClangCompleter() {
 
 
 bool ClangCompleter::UpdatingTranslationUnit( const std::string &filename ) {
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   shared_ptr< TranslationUnit > unit = translation_unit_store_.Get( filename );
 
   if ( !unit ) {
@@ -75,7 +75,7 @@ std::vector< Diagnostic > ClangCompleter::UpdateTranslationUnit(
   const std::string &translation_unit,
   const std::vector< UnsavedFile > &unsaved_files,
   const std::vector< std::string > &flags ) {
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   bool translation_unit_created;
   shared_ptr< TranslationUnit > unit = translation_unit_store_.GetOrCreate(
                                          translation_unit,
@@ -103,7 +103,7 @@ ClangCompleter::CandidatesForLocationInFile(
   int column,
   const std::vector< UnsavedFile > &unsaved_files,
   const std::vector< std::string > &flags ) {
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   shared_ptr< TranslationUnit > unit =
     translation_unit_store_.GetOrCreate( translation_unit,
                                          unsaved_files,
@@ -124,7 +124,7 @@ Location ClangCompleter::GetDeclarationLocation(
   const std::vector< UnsavedFile > &unsaved_files,
   const std::vector< std::string > &flags,
   bool reparse ) {
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   shared_ptr< TranslationUnit > unit =
     translation_unit_store_.GetOrCreate( translation_unit,
                                          unsaved_files,
@@ -146,7 +146,7 @@ Location ClangCompleter::GetDefinitionLocation(
   const std::vector< UnsavedFile > &unsaved_files,
   const std::vector< std::string > &flags,
   bool reparse ) {
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   shared_ptr< TranslationUnit > unit =
     translation_unit_store_.GetOrCreate( translation_unit,
                                          unsaved_files,
@@ -167,7 +167,7 @@ Location ClangCompleter::GetDefinitionOrDeclarationLocation(
   const std::vector< UnsavedFile > &unsaved_files,
   const std::vector< std::string > &flags,
   bool reparse ) {
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   shared_ptr< TranslationUnit > unit =
     translation_unit_store_.GetOrCreate( translation_unit,
                                          unsaved_files,
@@ -189,7 +189,7 @@ std::string ClangCompleter::GetTypeAtLocation(
   const std::vector< std::string > &flags,
   bool reparse ) {
 
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   shared_ptr< TranslationUnit > unit =
     translation_unit_store_.GetOrCreate( translation_unit,
                                          unsaved_files,
@@ -211,7 +211,7 @@ std::string ClangCompleter::GetEnclosingFunctionAtLocation(
   const std::vector< std::string > &flags,
   bool reparse ) {
 
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   shared_ptr< TranslationUnit > unit =
     translation_unit_store_.GetOrCreate( translation_unit,
                                          unsaved_files,
@@ -234,7 +234,7 @@ ClangCompleter::GetFixItsForLocationInFile(
   const std::vector< std::string > &flags,
   bool reparse ) {
 
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
 
   shared_ptr< TranslationUnit > unit =
     translation_unit_store_.GetOrCreate( translation_unit,
@@ -258,19 +258,33 @@ DocumentationData ClangCompleter::GetDocsForLocationInFile(
   const std::vector< std::string > &flags,
   bool reparse ) {
 
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
 
   shared_ptr< TranslationUnit > unit =
     translation_unit_store_.GetOrCreate( translation_unit,
                                          unsaved_files,
                                          flags );
 
-  return unit->GetDocsForLocationInFile( filename,
-                                         line,
-                                         column,
-                                         unsaved_files,
-                                         reparse );
+  Location location( unit->GetDeclarationLocation( filename,
+                                                   line,
+                                                   column,
+                                                   unsaved_files,
+                                                   reparse ) );
+  // By default, libclang ignores comments from system headers and, in
+  // particular, headers included with the -isystem flag. If the declaration is
+  // found in such header, get the documentation directly from the corresponding
+  // translation unit. Comments in the main file of a translation unit are not
+  // ignored.
+  if ( unit->LocationIsInSystemHeader( location ) ) {
+    unit = translation_unit_store_.GetOrCreate( location.filename_,
+                                                unsaved_files,
+                                                flags );
+    return unit->GetDocsForLocation( location, unsaved_files, reparse );
+  }
 
+  // This translation unit has already been parsed when getting the
+  // declaration's location.
+  return unit->GetDocsForLocation( location, unsaved_files, false );
 }
 
 std::vector< Token > ClangCompleter::GetSemanticTokens(
@@ -281,7 +295,7 @@ std::vector< Token > ClangCompleter::GetSemanticTokens(
   int end_line,
   int end_column ) {
 
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   shared_ptr< TranslationUnit > unit = translation_unit_store_.Get( translation_unit );
 
   if ( !unit )
@@ -296,7 +310,7 @@ std::vector< Range > ClangCompleter::GetSkippedRanges(
   const std::string &translation_unit,
   const std::string &filename ) {
 
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   shared_ptr< TranslationUnit > unit = translation_unit_store_.Get( translation_unit );
 
   if ( !unit )
@@ -306,7 +320,7 @@ std::vector< Range > ClangCompleter::GetSkippedRanges(
 }
 
 void ClangCompleter::DeleteCachesForFile( const std::string &filename ) {
-  ReleaseGil unlock;
+  pybind11::gil_scoped_release unlock;
   translation_unit_store_.Remove( filename );
 }
 

@@ -24,7 +24,7 @@ namespace YouCompleteMe {
 
 // Half-open, [start, end>
 struct Range {
-  Range() {}
+  Range() = default;
 
   Range( const Location &start_location, const Location &end_location )
     : start_( start_location ),
@@ -32,12 +32,6 @@ struct Range {
   }
 
   Range( const CXSourceRange &range );
-
-  bool operator== ( const Range &other ) const {
-    return
-      start_ == other.start_ &&
-      end_ == other.end_;
-  }
 
   Location start_;
   Location end_;

@@ -159,7 +159,7 @@ DIAG_MATCHERS_PER_FILE = {
       'fixit_available': False
     } ),
   ),
-  TestLauncher: contains_inanyorder (
+  TestLauncher: contains_inanyorder(
     has_entries( {
       'kind': 'ERROR',
       'text': 'The type new TestLauncher.Launchable(){} must implement the '
@@ -340,7 +340,7 @@ def Poll_Diagnostics_ProjectWide_Eclipse_test( app ):
 
   # Poll until we receive _all_ the diags asynchronously
   to_see = sorted( iterkeys( DIAG_MATCHERS_PER_FILE ) )
-  seen = dict()
+  seen = {}
 
   try:
     for message in PollForMessages( app,
@@ -679,7 +679,7 @@ def OnBufferUnload_ServerNotRunning_test( app ):
                                filepath = filepath,
                                filetype = 'java' )
     result = app.post_json( '/event_notification', event_data ).json
-    assert_that( result, equal_to( {}  ) )
+    assert_that( result, equal_to( {} ) )
 
 
 @IsolatedYcmd

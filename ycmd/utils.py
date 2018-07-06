@@ -25,6 +25,9 @@ from __future__ import absolute_import
 from builtins import *  # noqa
 
 from future.utils import PY2, native
+import collections
+import copy
+import json
 import os
 import socket
 import subprocess
@@ -46,6 +49,17 @@ if PY2:
 else:
   from urllib.parse import urljoin, urlparse  # noqa
   from urllib.request import pathname2url, url2pathname  # noqa
+
+
+# We replace the re module with regex as it has better support for characters on
+# multiple code points. However, this module has a compiled component so we
+# can't import it in YCM if it is built for a different version of Python (e.g.
+# if YCM is running on Python 2 while ycmd on Python 3). We fall back to the re
+# module in that case.
+try:
+  import regex as re
+except ImportError: # pragma: no cover
+  import re # noqa
 
 
 # Creation flag to disable creating a console window on Windows. See
@@ -390,7 +404,7 @@ def GetShortPathName( path ):
   _GetShortPathNameW = windll.kernel32.GetShortPathNameW
   _GetShortPathNameW.argtypes = [ wintypes.LPCWSTR,
                                   wintypes.LPWSTR,
-                                  wintypes.DWORD]
+                                  wintypes.DWORD ]
   _GetShortPathNameW.restype = wintypes.DWORD
 
   output_buf_size = 0
@@ -424,46 +438,16 @@ def LoadPythonSource( name, pathname ):
 
 
 def SplitLines( contents ):
-  """Return a list of each of the lines in the unicode string |contents|.
-  Behaviour is equivalent to str.splitlines with the following exceptions:
-    - empty strings are returned as [ '' ]
-    - a trailing newline is not ignored (i.e. SplitLines( '\n' )
-      returns [ '', '' ], not [ '' ]"""
+  """Return a list of each of the lines in the unicode string |contents|."""
 
   # We often want to get a list representation of a buffer such that we can
   # index all of the 'lines' within it. Python provides str.splitlines for this
-  # purpose, but its documented behaviors for empty strings and strings ending
-  # with a newline character are not compatible with this. As a result, we write
-  # our own wrapper to provide a splitlines implementation which returns the
-  # actual list of indexable lines in a buffer, where a line may have 0
-  # characters.
-  #
-  # NOTE: str.split( '\n' ) actually gives this behaviour, except it does not
-  # work when running on a unix-like system and reading a file with Windows line
-  # endings.
-
-  # ''.splitlines() returns [], but we want [ '' ]
-  if contents == '':
-    return [ '' ]
-
-  lines = contents.splitlines()
-
-  # '\n'.splitlines() returns [ '' ]. We want [ '', '' ].
-  # '\n\n\n'.splitlines() returns [ '', '', '' ]. We want [ '', '', '', '' ].
-  #
-  # So we re-instate the empty entry at the end if the original string ends
-  # with a newline. Universal newlines recognise the following as
-  # line-terminators:
-  #   - '\n'
-  #   - '\r\n'
-  #   - '\r'
-  #
-  # Importantly, notice that \r\n also ends with \n
-  #
-  if contents.endswith( '\r' ) or contents.endswith( '\n' ):
-    lines.append( '' )
-
-  return lines
+  # purpose. However, this method not only splits on newline characters (\n,
+  # \r\n, and \r) but also on line boundaries like \v and \f. Since old
+  # Macintosh newlines (\r) are obsolete and Windows newlines (\r\n) end with a
+  # \n character, we can ignore carriage return characters (\r) and only split
+  # on \n.
+  return contents.split( '\n' )
 
 
 def GetCurrentDirectory():
@@ -485,3 +469,43 @@ def StartThread( func, *args ):
   thread.daemon = True
   thread.start()
   return thread
+
+
+class HashableDict( collections.Mapping ):
+  """An immutable dictionary that can be used in dictionary's keys. The
+  dictionary must be JSON-encodable; in particular, all keys must be strings."""
+
+  def __init__( self, *args, **kwargs ):
+    self._dict = dict( *args, **kwargs )
+
+
+  def __getitem__( self, key ):
+    return copy.deepcopy( self._dict[ key ] )
+
+
+  def __iter__( self ):
+    return iter( self._dict )
+
+
+  def __len__( self ):
+    return len( self._dict )
+
+
+  def __repr__( self ):
+    return '<HashableDict %s>' % repr( self._dict )
+
+
+  def __hash__( self ):
+    try:
+      return self._hash
+    except AttributeError:
+      self._hash = json.dumps( self._dict, sort_keys = True ).__hash__()
+      return self._hash
+
+
+  def __eq__( self, other ):
+    return isinstance( other, HashableDict ) and self._dict == other._dict
+
+
+  def __ne__( self, other ):
+    return not self == other

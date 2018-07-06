@@ -88,8 +88,6 @@ struct Token {
   Token( const CXTokenKind kind, const CXSourceRange &tokenRange,
          const CXCursor &cursor );
 
-  bool operator==( const Token &other ) const;
-
   Kind kind;
 
   Type type;

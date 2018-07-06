@@ -37,19 +37,20 @@ from ycmd.tests import PathToTestFile
 
 DIR_OF_THIRD_PARTY = os.path.abspath(
   os.path.join( os.path.dirname( __file__ ), '..', '..', 'third_party' ) )
-THIRD_PARTY_FOLDERS = (
+THIRD_PARTY_FOLDERS = [
   os.path.join( DIR_OF_THIRD_PARTY, 'bottle' ),
   os.path.join( DIR_OF_THIRD_PARTY, 'frozendict' ),
   os.path.join( DIR_OF_THIRD_PARTY, 'godef' ),
   os.path.join( DIR_OF_THIRD_PARTY, 'gocode' ),
-  os.path.join( DIR_OF_THIRD_PARTY, 'JediHTTP' ),
+  os.path.join( DIR_OF_THIRD_PARTY, 'jedi' ),
   os.path.join( DIR_OF_THIRD_PARTY, 'OmniSharpServer' ),
+  os.path.join( DIR_OF_THIRD_PARTY, 'parso' ),
   os.path.join( DIR_OF_THIRD_PARTY, 'racerd' ),
   os.path.join( DIR_OF_THIRD_PARTY, 'requests' ),
   os.path.join( DIR_OF_THIRD_PARTY, 'tern_runtime' ),
   os.path.join( DIR_OF_THIRD_PARTY, 'waitress' ),
   os.path.join( DIR_OF_THIRD_PARTY, 'eclipse.jdt.ls' ),
-)
+]
 
 
 @patch( 'ycmd.server_utils._logger', autospec = True )
