@@ -54,7 +54,7 @@ def setUpModule( app ):
 def _BuildTokenData( kind, type, sl, sc, el, ec ):
   token = SemanticToken( kind, type,
                          Range( Location( sl, sc, _TEST_FILE ),
-                                Location( el, ec, _TEST_FILE ) )  )
+                                Location( el, ec, _TEST_FILE ) ) )
   return BuildSemanticTokenData( token )
 
 
