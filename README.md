@@ -46,22 +46,24 @@ Note that **ycmd runs on Python 2.7.1+ and 3.4+.**
 
 First, install the minimal dependencies:
 ```
-sudo apt install build-essential cmake python-dev
+sudo apt install build-essential cmake python3-dev
 ```
 
 Next, install the language specific dependencies you need:
 - `sudo apt install golang-go` for Go.
-- `sudo apt install npm` for JavaScript and TypeScript.
+- `sudo apt install npm` and `sudo npm -g install typescript` for JavaScript and
+  TypeScript.
 - `sudo apt install mono-devel` for C#.
-- Concerning Rust, install Cargo and rustc with [rustup](https://www.rustup.rs/).
+- install Cargo and rustc with [rustup][] for Rust.
+- `sudo apt install openjdk-8-jre` for Java.
 
 When you first clone the repository you'll need to update the submodules:
 ```
 git submodule update --init --recursive
 ```
 
-Then run `./build.py --all` or any of the specific completers listed by
-`./build.py --help`. This should get you going.
+Then run `python3 build.py --all` or any of the specific completers listed by
+`python3 build.py --help`. This should get you going.
 
 For more detailed instructions on building ycmd, see [YCM's
 instructions][ycm-install] (ignore the Vim-specific parts).
@@ -102,8 +104,8 @@ completer that provides semantic completion for C-family languages.  There's
 also a Jedi-based completer for semantic completion for Python, an
 OmniSharp-based completer for C#, a [Gocode][gocode]-based completer for Go
 (using [Godef][godef] for jumping to definitions), a TSServer-based completer
-for TypeScript and a [jdt.ls][jdtls]-based server for Java. More will be added
-with time.
+for JavaScript and TypeScript, and a [jdt.ls][jdtls]-based server for Java. More
+will be added with time.
 
 There are also other completion engines, like the filepath completer (part of
 the identifier completer).
@@ -423,3 +425,4 @@ This software is licensed under the [GPL v3 license][gpl].
 [jdtls]: https://github.com/eclipse/eclipse.jdt.ls
 [api-docs]: https://valloric.github.io/ycmd/
 [ycmd-extra-conf]: https://github.com/Valloric/ycmd/blob/master/.ycm_extra_conf.py
+[rustup]: https://www.rustup.rs/

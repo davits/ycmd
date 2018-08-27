@@ -63,7 +63,8 @@ COMPLETERS = {
   },
   'javascript': {
     'build': [ '--js-completer' ],
-    'test': [ '--exclude-dir=ycmd/tests/javascript' ],
+    'test': [ '--exclude-dir=ycmd/tests/javascript',
+              '--exclude-dir=ycmd/tests/tern' ],
     'aliases': [ 'js', 'tern' ]
   },
   'go': {
@@ -174,11 +175,10 @@ def BuildYcmdLibs( args ):
     else:
       os.environ[ 'EXTRA_CMAKE_ARGS' ] = '-DUSE_DEV_FLAGS=ON'
 
-    os.environ[ 'YCM_TESTRUN' ] = '1'
-
     build_cmd = [
       sys.executable,
       p.join( DIR_OF_THIS_SCRIPT, 'build.py' ),
+      '--core-tests',
       '--quiet',
     ]
 
