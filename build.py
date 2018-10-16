@@ -9,6 +9,7 @@ from __future__ import absolute_import
 
 from shutil import rmtree
 from tempfile import mkdtemp
+import argparse
 import errno
 import hashlib
 import multiprocessing
@@ -43,10 +44,8 @@ for folder in os.listdir( DIR_OF_THIRD_PARTY ):
                                                             DIR_OF_THIRD_PARTY )
     )
 
-sys.path.insert( 1, p.abspath( p.join( DIR_OF_THIRD_PARTY, 'argparse' ) ) )
 sys.path.insert( 1, p.abspath( p.join( DIR_OF_THIRD_PARTY, 'requests' ) ) )
 
-import argparse
 import requests
 
 NO_DYNAMIC_PYTHON_ERROR = (
@@ -56,6 +55,7 @@ NO_DYNAMIC_PYTHON_ERROR = (
   '  export PYTHON_CONFIGURE_OPTS="{flag}"\n'
   'before installing a Python version.' )
 NO_PYTHON_LIBRARY_ERROR = 'ERROR: unable to find an appropriate Python library.'
+NO_PYTHON_HEADERS_ERROR = 'ERROR: Python headers are missing in {include_dir}.'
 
 # Regular expressions used to find static and dynamic Python libraries.
 # Notes:
@@ -79,11 +79,13 @@ DYNAMIC_PYTHON_LIBRARY_REGEX = """
   )$
 """
 
-JDTLS_MILESTONE = '0.18.0'
-JDTLS_BUILD_STAMP = '201805010001'
+JDTLS_MILESTONE = '0.26.0'
+JDTLS_BUILD_STAMP = '201810021912'
 JDTLS_SHA256 = (
-  '9253d4222519442b65b4a01516c9496354b59813d906357a5f3f265601cc77db'
+  '37c02deb37335668321643571e7316a231d94d07707325afdb83b16c953f2244'
 )
+
+TSSERVER_VERSION = '3.1.3'
 
 BUILD_ERROR_MESSAGE = (
   'ERROR: the build failed.\n\n'
@@ -232,6 +234,9 @@ def GetPossiblePythonLibraryDirectories():
 
 def FindPythonLibraries():
   include_dir = sysconfig.get_config_var( 'INCLUDEPY' )
+  if not p.isfile( p.join( include_dir, 'Python.h' ) ):
+    sys.exit( NO_PYTHON_HEADERS_ERROR.format( include_dir = include_dir ) )
+
   library_dirs = GetPossiblePythonLibraryDirectories()
 
   # Since ycmd is compiled as a dynamic library, we can't link it to a Python
@@ -323,6 +328,9 @@ def ParseArguments():
                        help = 'Enable Rust semantic completion engine.' )
   parser.add_argument( '--java-completer', action = 'store_true',
                        help = 'Enable Java semantic completion engine.' ),
+  parser.add_argument( '--ts-completer', action = 'store_true',
+                       help = 'Enable JavaScript and TypeScript semantic '
+                              'completion engine.' ),
   parser.add_argument( '--system-boost', action = 'store_true',
                        help = 'Use the system boost instead of bundled one. '
                        'NOT RECOMMENDED OR SUPPORTED!' )
@@ -605,12 +613,17 @@ def EnableCsCompleter( args ):
 def EnableGoCompleter( args ):
   go = FindExecutableOrDie( 'go', 'go is required to build gocode.' )
 
-  os.chdir( p.join( DIR_OF_THIS_SCRIPT, 'third_party', 'gocode' ) )
+  go_dir = p.join( DIR_OF_THIS_SCRIPT, 'third_party', 'go' )
+  os.chdir( p.join( go_dir, 'src', 'github.com', 'mdempsky', 'gocode' ) )
+  new_env = os.environ.copy()
+  new_env[ 'GOPATH' ] = go_dir
   CheckCall( [ go, 'build' ],
+             env = new_env,
              quiet = args.quiet,
              status_message = 'Building gocode for go completion' )
-  os.chdir( p.join( DIR_OF_THIS_SCRIPT, 'third_party', 'godef' ) )
-  CheckCall( [ go, 'build', 'godef.go' ],
+  os.chdir( p.join( go_dir, 'src', 'github.com', 'rogpeppe', 'godef' ) )
+  CheckCall( [ go, 'build' ],
+             env = new_env,
              quiet = args.quiet,
              status_message = 'Building godef for go definition' )
 
@@ -634,7 +647,6 @@ def EnableRustCompleter( args ):
 
 
 def EnableJavaScriptCompleter( args ):
-  node = FindExecutableOrDie( 'node', 'node is required to set up Tern.' )
   npm = FindExecutableOrDie( 'npm', 'npm is required to set up Tern.' )
 
   # We install Tern into a runtime directory. This allows us to control
@@ -721,6 +733,16 @@ def EnableJavaCompleter( switches ):
     print( 'OK' )
 
 
+def EnableTypeScriptCompleter( args ):
+  npm = FindExecutableOrDie( 'npm', 'npm is required to install TSServer.' )
+  tsserver_folder = p.join( DIR_OF_THIRD_PARTY, 'tsserver' )
+  CheckCall( [ npm, 'install', '-g', '--prefix', tsserver_folder,
+               'typescript@{version}'.format( version = TSSERVER_VERSION ) ],
+             quiet = args.quiet,
+             status_message = 'Installing TSServer for JavaScript '
+                              'and TypeScript completion' )
+
+
 def WritePythonUsedDuringBuild():
   path = p.join( DIR_OF_THIS_SCRIPT, 'PYTHON_USED_DURING_BUILDING' )
   with open( path, 'w' ) as f:
@@ -747,6 +769,8 @@ def Main():
     EnableRustCompleter( args )
   if args.java_completer or args.all_completers:
     EnableJavaCompleter( args )
+  if args.ts_completer or args.all_completers:
+    EnableTypeScriptCompleter( args )
 
 
 if __name__ == '__main__':

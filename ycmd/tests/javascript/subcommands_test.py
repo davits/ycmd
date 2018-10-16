@@ -24,7 +24,10 @@ from __future__ import division
 # Not installing aliases from python-future; it's unreliable and slow.
 from builtins import *  # noqa
 
-from hamcrest import ( assert_that, contains, contains_inanyorder, has_entries,
+from hamcrest import ( assert_that,
+                       contains,
+                       contains_inanyorder,
+                       has_entries,
                        matches_regexp )
 from nose.tools import eq_
 import requests

@@ -76,13 +76,17 @@ PYBIND11_MODULE( ycm_core, mod )
   py::class_< IdentifierCompleter >( mod, "IdentifierCompleter" )
     .def( py::init<>() )
     .def( "AddIdentifiersToDatabase",
-          &IdentifierCompleter::AddIdentifiersToDatabase )
+          &IdentifierCompleter::AddIdentifiersToDatabase,
+          py::call_guard< py::gil_scoped_release >() )
     .def( "ClearForFileAndAddIdentifiersToDatabase",
-          &IdentifierCompleter::ClearForFileAndAddIdentifiersToDatabase )
+          &IdentifierCompleter::ClearForFileAndAddIdentifiersToDatabase,
+          py::call_guard< py::gil_scoped_release >() )
     .def( "AddIdentifiersToDatabaseFromTagFiles",
-          &IdentifierCompleter::AddIdentifiersToDatabaseFromTagFiles )
+          &IdentifierCompleter::AddIdentifiersToDatabaseFromTagFiles,
+          py::call_guard< py::gil_scoped_release >() )
     .def( "CandidatesForQueryAndType",
           &IdentifierCompleter::CandidatesForQueryAndType,
+          py::call_guard< py::gil_scoped_release >(),
           py::arg( "query" ),
           py::arg( "filetype" ),
           py::arg( "max_candidates" ) = 0 );
@@ -108,24 +112,43 @@ PYBIND11_MODULE( ycm_core, mod )
 
   py::class_< ClangCompleter >( mod, "ClangCompleter" )
     .def( py::init<>() )
-    .def( "GetDeclarationLocation", &ClangCompleter::GetDeclarationLocation )
-    .def( "GetDefinitionLocation", &ClangCompleter::GetDefinitionLocation )
+    .def( "GetDeclarationLocation",
+          &ClangCompleter::GetDeclarationLocation,
+          py::call_guard< py::gil_scoped_release >() )
+    .def( "GetDefinitionLocation",
+          &ClangCompleter::GetDefinitionLocation,
+          py::call_guard< py::gil_scoped_release >() )
     .def( "GetDefinitionOrDeclarationLocation",
-          &ClangCompleter::GetDefinitionOrDeclarationLocation )
-    .def( "DeleteCachesForFile", &ClangCompleter::DeleteCachesForFile )
-    .def( "UpdatingTranslationUnit", &ClangCompleter::UpdatingTranslationUnit )
-    .def( "UpdateTranslationUnit", &ClangCompleter::UpdateTranslationUnit )
+          &ClangCompleter::GetDefinitionOrDeclarationLocation,
+          py::call_guard< py::gil_scoped_release >() )
+    .def( "DeleteCachesForFile",
+          &ClangCompleter::DeleteCachesForFile,
+          py::call_guard< py::gil_scoped_release >() )
+    .def( "UpdatingTranslationUnit",
+          &ClangCompleter::UpdatingTranslationUnit,
+          py::call_guard< py::gil_scoped_release >() )
+    .def( "UpdateTranslationUnit",
+          &ClangCompleter::UpdateTranslationUnit,
+          py::call_guard< py::gil_scoped_release >() )
     .def( "CandidatesForLocationInFile",
-          &ClangCompleter::CandidatesForLocationInFile )
-    .def( "GetTypeAtLocation", &ClangCompleter::GetTypeAtLocation )
+          &ClangCompleter::CandidatesForLocationInFile,
+          py::call_guard< py::gil_scoped_release >() )
+    .def( "GetTypeAtLocation",
+          &ClangCompleter::GetTypeAtLocation,
+          py::call_guard< py::gil_scoped_release >() )
     .def( "GetEnclosingFunctionAtLocation",
-          &ClangCompleter::GetEnclosingFunctionAtLocation )
+          &ClangCompleter::GetEnclosingFunctionAtLocation,
+          py::call_guard< py::gil_scoped_release >() )
     .def( "GetFixItsForLocationInFile",
-          &ClangCompleter::GetFixItsForLocationInFile )
+          &ClangCompleter::GetFixItsForLocationInFile,
+          py::call_guard< py::gil_scoped_release >() )
     .def( "GetDocsForLocationInFile",
-          &ClangCompleter::GetDocsForLocationInFile )
-    .def( "GetSemanticTokens", &ClangCompleter::GetSemanticTokens )
-    .def( "GetSkippedRanges", &ClangCompleter::GetSkippedRanges );
+          &ClangCompleter::GetDocsForLocationInFile,
+          py::call_guard< py::gil_scoped_release >() )
+    .def( "GetSemanticTokens", &ClangCompleter::GetSemanticTokens,
+          py::call_guard< py::gil_scoped_release >() )
+    .def( "GetSkippedRanges", &ClangCompleter::GetSkippedRanges,
+          py::call_guard< py::gil_scoped_release >() );
 
   py::enum_< CompletionKind >( mod, "CompletionKind" )
     .value( "STRUCT", CompletionKind::STRUCT )
@@ -148,7 +171,8 @@ PYBIND11_MODULE( ycm_core, mod )
     .def( "DetailedInfoForPreviewWindow",
           &CompletionData::DetailedInfoForPreviewWindow )
     .def( "DocString", &CompletionData::DocString )
-    .def_readonly( "kind_", &CompletionData::kind_ );
+    .def_readonly( "kind_", &CompletionData::kind_ )
+    .def_readonly( "fixit_", &CompletionData::fixit_ );
 
   py::bind_vector< std::vector< CompletionData > >( mod,
                                                     "CompletionVector" );

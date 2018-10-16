@@ -33,9 +33,8 @@ from collections import defaultdict, namedtuple
 from ycmd import responses
 from ycmd.completers.general.filename_completer import ( GetPathType,
                                                          GetPathTypeName )
+from ycmd.utils import GetModificationTime, ListDirectory
 
-import logging
-_logger = logging.getLogger( __name__ )
 
 """ Represents single include completion candidate.
 name is the name/string of the completion candidate,
@@ -83,11 +82,11 @@ class IncludeCache( object ):
     self._cache_lock = threading.Lock()
 
 
-  def GetIncludes( self, path ):
-    includes = self._GetCached( path )
+  def GetIncludes( self, path, is_framework = False ):
+    includes = self._GetCached( path, is_framework )
 
     if includes is None:
-      includes = self._ListIncludes( path )
+      includes = self._ListIncludes( path, is_framework )
       self._AddToCache( path, includes )
 
     return includes
@@ -95,21 +94,21 @@ class IncludeCache( object ):
 
   def _AddToCache( self, path, includes, mtime = None ):
     if not mtime:
-      mtime = _GetModificationTime( path )
+      mtime = GetModificationTime( path )
     # mtime of 0 is "a magic value" to represent inaccessible directory mtime.
     if mtime:
       with self._cache_lock:
         self._cache[ path ] = { 'mtime': mtime, 'includes': includes }
 
 
-  def _GetCached( self, path ):
+  def _GetCached( self, path, is_framework ):
     includes = None
     with self._cache_lock:
       cache_entry = self._cache.get( path )
     if cache_entry:
-      mtime = _GetModificationTime( path )
+      mtime = GetModificationTime( path )
       if mtime > cache_entry[ 'mtime' ]:
-        includes = self._ListIncludes( path )
+        includes = self._ListIncludes( path, is_framework )
         self._AddToCache( path, includes, mtime )
       else:
         includes = cache_entry[ 'includes' ]
@@ -117,26 +116,16 @@ class IncludeCache( object ):
     return includes
 
 
-  def _ListIncludes( self, path ):
-    try:
-      names = os.listdir( path )
-    except OSError:
-      _logger.exception( 'Can not list entries for include path %s.', path )
-      return []
-
+  def _ListIncludes( self, path, is_framework ):
     includes = []
-    for name in names:
+    for name in ListDirectory( path ):
+      if is_framework:
+        if not name.endswith( '.framework' ):
+          continue
+        name = name[ : -len( '.framework' ) ]
+
       inc_path = os.path.join( path, name )
-      entry_type = GetPathType( inc_path )
+      entry_type = GetPathType( inc_path, is_framework )
       includes.append( IncludeEntry( name, entry_type ) )
 
     return includes
-
-
-def _GetModificationTime( path ):
-  try:
-    return os.path.getmtime( path )
-  except OSError:
-    _logger.exception( 'Can not get modification time for include path %s.',
-                       path )
-    return 0

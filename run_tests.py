@@ -9,6 +9,7 @@ from __future__ import absolute_import
 # Not installing aliases from python-future; it's unreliable and slow.
 from builtins import *  # noqa
 
+import argparse
 import platform
 import os
 import subprocess
@@ -38,10 +39,6 @@ if os.environ.get( 'PYTHONPATH' ) is not None:
   python_path.append( os.environ['PYTHONPATH'] )
 os.environ[ 'PYTHONPATH' ] = os.pathsep.join( python_path )
 
-sys.path.insert( 1, p.abspath( p.join( DIR_OF_THIRD_PARTY, 'argparse' ) ) )
-
-import argparse
-
 
 def RunFlake8():
   print( 'Running flake8' )
@@ -63,8 +60,7 @@ COMPLETERS = {
   },
   'javascript': {
     'build': [ '--js-completer' ],
-    'test': [ '--exclude-dir=ycmd/tests/javascript',
-              '--exclude-dir=ycmd/tests/tern' ],
+    'test': [ '--exclude-dir=ycmd/tests/tern' ],
     'aliases': [ 'js', 'tern' ]
   },
   'go': {
@@ -78,9 +74,10 @@ COMPLETERS = {
     'aliases': [ 'racer', 'racerd', ]
   },
   'typescript': {
-    'build': [],
-    'test': [ '--exclude-dir=ycmd/tests/typescript' ],
-    'aliases': []
+    'build': [ '--ts-completer' ],
+    'test': [ '--exclude-dir=ycmd/tests/javascript',
+              '--exclude-dir=ycmd/tests/typescript' ],
+    'aliases': [ 'ts' ]
   },
   'python': {
     'build': [],

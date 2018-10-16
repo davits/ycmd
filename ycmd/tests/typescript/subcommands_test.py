@@ -24,8 +24,12 @@ from __future__ import division
 # Not installing aliases from python-future; it's unreliable and slow.
 from builtins import *  # noqa
 
-from hamcrest import ( assert_that, contains, contains_inanyorder, has_entries,
-                       has_entry, matches_regexp )
+from hamcrest import ( assert_that,
+                       contains,
+                       contains_inanyorder,
+                       has_entries,
+                       has_entry,
+                       matches_regexp )
 from mock import patch
 from nose.tools import eq_
 import requests
@@ -392,7 +396,7 @@ def Subcommands_GetType_HasNoType_test( app ):
     'description': 'GetType returns an error on a keyword',
     'request': {
       'command': 'GetType',
-      'line_num': 2,
+      'line_num': 32,
       'column_num': 1,
       'filepath': PathToTestFile( 'test.ts' ),
     },
