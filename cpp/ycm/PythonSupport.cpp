@@ -36,7 +36,7 @@ namespace YouCompleteMe {
 namespace {
 
 std::vector< const Candidate * > CandidatesFromObjectList(
-  const pylist &candidates,
+  pylist candidates,
   const std::string &candidate_property ) {
   size_t num_candidates = len( candidates );
   std::vector< std::string > candidate_strings;
@@ -55,16 +55,16 @@ std::vector< const Candidate * > CandidatesFromObjectList(
   }
 
   return CandidateRepository::Instance().GetCandidatesForStrings(
-           candidate_strings );
+           std::move( candidate_strings ) );
 }
 
 } // unnamed namespace
 
 
 pylist FilterAndSortCandidates(
-  const pylist &candidates,
+  pylist candidates,
   const std::string &candidate_property,
-  const std::string &query,
+  std::string query,
   const size_t max_candidates ) {
   pylist filtered_candidates;
 
@@ -75,7 +75,7 @@ pylist FilterAndSortCandidates(
   std::vector< ResultAnd< size_t > > result_and_objects;
   {
     pybind11::gil_scoped_release unlock;
-    Word query_object( query );
+    Word query_object( std::move( query ) );
 
     for ( size_t i = 0; i < num_candidates; ++i ) {
       const Candidate *candidate = repository_candidates[ i ];

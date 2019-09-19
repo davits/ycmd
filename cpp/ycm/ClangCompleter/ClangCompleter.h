@@ -18,11 +18,11 @@
 #ifndef CLANGCOMPLETE_H_WLKDU0ZV
 #define CLANGCOMPLETE_H_WLKDU0ZV
 
-#include "UnsavedFile.h"
 #include "Diagnostic.h"
+#include "Documentation.h"
 #include "Token.h"
 #include "TranslationUnitStore.h"
-#include "Documentation.h"
+#include "UnsavedFile.h"
 
 #include <string>
 

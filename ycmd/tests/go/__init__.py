@@ -25,8 +25,12 @@ from builtins import *  # noqa
 import functools
 import os
 
-from ycmd.tests.test_utils import ( ClearCompletionsCache, IsolatedApp,
-                                    SetUpApp, StopCompleterServer,
+from ycmd.tests.test_utils import ( BuildRequest,
+                                    ClearCompletionsCache,
+                                    IgnoreExtraConfOutsideTestsFolder,
+                                    IsolatedApp,
+                                    SetUpApp,
+                                    StopCompleterServer,
                                     WaitUntilCompleterServerReady )
 
 shared_app = None
@@ -34,7 +38,8 @@ shared_app = None
 
 def PathToTestFile( *args ):
   dir_of_current_script = os.path.dirname( os.path.abspath( __file__ ) )
-  return os.path.join( dir_of_current_script, 'testdata', *args )
+  # GOPLS doesn't work if any parent directory is named "testdata"
+  return os.path.join( dir_of_current_script, 'go_module', *args )
 
 
 def setUpPackage():
@@ -45,7 +50,17 @@ def setUpPackage():
   global shared_app
 
   shared_app = SetUpApp()
-  WaitUntilCompleterServerReady( shared_app, 'go' )
+  with IgnoreExtraConfOutsideTestsFolder():
+    StartGoCompleterServerInDirectory( shared_app, PathToTestFile() )
+
+
+def StartGoCompleterServerInDirectory( app, directory ):
+  app.post_json( '/event_notification',
+                 BuildRequest(
+                   filepath = os.path.join( directory, 'goto.go' ),
+                   event_name = 'FileReadyToParse',
+                   filetype = 'go' ) )
+  WaitUntilCompleterServerReady( app, 'go' )
 
 
 def tearDownPackage():

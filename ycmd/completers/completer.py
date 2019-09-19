@@ -121,7 +121,11 @@ class Completer( with_metaclass( abc.ABCMeta, object ) ):
   ycmd.responses.BuildCompletionData to build the detailed response. See
   clang_completer.py to see how its used in practice.
 
-  Again, you probably want to override ComputeCandidatesInner().
+  Again, you probably want to override ComputeCandidatesInner(). If computing
+  the fields of the candidates is costly, you should consider building only the
+  "insertion_text" field in ComputeCandidatesInner() then fill the remaining
+  fields in DetailCandidates() which is called after the filtering is done. See
+  python_completer.py for an example.
 
   You also need to implement the SupportedFiletypes() function which should
   return a list of strings, where the strings are Vim filetypes your completer
@@ -174,7 +178,7 @@ class Completer( with_metaclass( abc.ABCMeta, object ) ):
     self.min_num_chars = user_options[ 'min_num_of_chars_for_completion' ]
     self.max_diagnostics_to_display = user_options[
         'max_diagnostics_to_display' ]
-    self.prepared_triggers = (
+    self.completion_triggers = (
         completer_utils.PreparedTriggers(
             user_trigger_map = user_options[ 'semantic_triggers' ],
             filetype_set = set( self.SupportedFiletypes() ) )
@@ -205,14 +209,14 @@ class Completer( with_metaclass( abc.ABCMeta, object ) ):
 
 
   def ShouldUseNowInner( self, request_data ):
-    if not self.prepared_triggers:
+    if not self.completion_triggers:
       return False
     current_line = request_data[ 'line_value' ]
     start_codepoint = request_data[ 'start_codepoint' ] - 1
     column_codepoint = request_data[ 'column_codepoint' ] - 1
     filetype = self._CurrentFiletype( request_data[ 'filetypes' ] )
 
-    return self.prepared_triggers.MatchesForFiletype(
+    return self.completion_triggers.MatchesForFiletype(
         current_line, start_codepoint, column_codepoint, filetype )
 
 
@@ -232,7 +236,9 @@ class Completer( with_metaclass( abc.ABCMeta, object ) ):
       return []
 
     candidates = self._GetCandidatesFromSubclass( request_data )
-    return self.FilterAndSortCandidates( candidates, request_data[ 'query' ] )
+    candidates = self.FilterAndSortCandidates( candidates,
+                                               request_data[ 'query' ] )
+    return self.DetailCandidates( request_data, candidates )
 
 
   def _GetCandidatesFromSubclass( self, request_data ):
@@ -245,6 +251,10 @@ class Completer( with_metaclass( abc.ABCMeta, object ) ):
     raw_completions = self.ComputeCandidatesInner( request_data )
     self._completions_cache.Update( request_data, raw_completions )
     return raw_completions
+
+
+  def DetailCandidates( self, request_data, candidates ):
+    return candidates
 
 
   def ComputeCandidatesInner( self, request_data ):
@@ -412,7 +422,7 @@ class CompletionsCache( object ):
   """Cache of computed completions for a particular request."""
 
   def __init__( self ):
-    self._access_lock = threading.Lock()
+    self._access_lock = threading.RLock()
     self.Invalidate()
 
 
